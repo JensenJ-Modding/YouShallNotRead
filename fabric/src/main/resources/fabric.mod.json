@@ -1,9 +1,9 @@
 {
   "schemaVersion": 1,
-  "id": "architecturymod",
+  "id": "youshallnotread",
   "version": "${version}",
-  "name": "Architectury Mod",
-  "description": "Mod Description",
+  "name": "YouShallNotRead",
+  "description": "A simple library mod used by my other mods.",
   "authors": [
     "JensenJ - Developer"
   ],
@@ -15,12 +15,12 @@
   "environment": "*",
   "entrypoints": {
     "main": [
-      "net.architecturymod.fabric.ArchitecturyModFabric"
+      "net.youshallnotread.fabric.YouShallNotReadFabric"
     ]
   },
   "mixins": [
-    "architecturymod-common.mixins.json",
-    "architecturymod-fabric.mixins.json"
+    "youshallnotread-common.mixins.json",
+    "youshallnotread-fabric.mixins.json"
   ],
   "depends": {
     "fabric": "*",

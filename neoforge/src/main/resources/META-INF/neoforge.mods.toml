@@ -4,29 +4,29 @@ issueTrackerURL = "https://github.com/JensenJ-Modding/Architectury-Template/issu
 license = "MIT License"
 
 [[mods]]
-modId = "architecturymod"
+modId = "youshallnotread"
 version = "${version}"
-displayName = "Architectury Mod"
+displayName = "YouShallNotRead"
 authors = "JensenJ - Developer"
 description = '''
-Mod Description
+A simple library mod used by my other mods.
 '''
 
-[[dependencies.architecturymod]]
+[[dependencies.youshallnotread]]
 modId = "neoforge"
 type = "required"
 versionRange = "[21.1,)"
 ordering = "NONE"
 side = "BOTH"
 
-[[dependencies.architecturymod]]
+[[dependencies.youshallnotread]]
 modId = "minecraft"
 type = "required"
 versionRange = "[1.21.1,)"
 ordering = "NONE"
 side = "BOTH"
 
-[[dependencies.architecturymod]]
+[[dependencies.youshallnotread]]
 modId = "architectury"
 type = "required"
 versionRange = "[13.0.8,)"
@@ -34,7 +34,7 @@ ordering = "AFTER"
 side = "BOTH"
 
 [[mixins]]
-config = "architecturymod-neoforge.mixins.json"
+config = "youshallnotread-neoforge.mixins.json"
 
 [[mixins]]
-config = "architecturymod-common.mixins.json"
+config = "youshallnotread-common.mixins.json"
