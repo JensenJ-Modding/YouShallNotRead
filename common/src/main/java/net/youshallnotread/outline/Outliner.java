@@ -7,46 +7,71 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 
+import com.mojang.blaze3d.vertex.PoseStack;
 import net.youshallnotread.Utils;
-import net.youshallnotread.YouShallNotRead;
 
 public class Outliner {
 
+    public static float RENDER_DELTA;
+
     static final Map<String, Outline> OUTLINES = new HashMap<>();
+    static final Map<UUID, Set<Outline>> SUSPENDED_OUTLINES = new HashMap<>();
     private static boolean isBlockListDirty = false;
 
-    public static void processOutlines(Level level) {
-        YouShallNotRead.LOGGER.info(OUTLINES);
-
-        List<String> outlinesToDestroy = getOutlinesToDestroy();
+    public static void processOutlines(Level level, PoseStack stack) {
+        List<Outline> outlinesToDestroy = getOutlinesToDestroy();
         calculateMergedOutlines();
-        outlinesToDestroy.forEach(OUTLINES::remove);
+        outlinesToDestroy.forEach(Outliner::removeOutline);
+
+        List<Outline> outlinesToSuspend = getOutlinesToSuspend();
+        outlinesToSuspend.forEach(Outliner::suspendOutline);
 
         ResourceKey<Level> dimension = level.dimension();
-        renderBlockOutlines(dimension);
-        renderEntityOutlines(dimension);
+        renderStaticOutlines(dimension, stack);
+        renderDynamicOutlines(dimension, stack);
     }
 
-    public static List<String> getOutlinesToDestroy() {
-        List<String> outlinesToRemove = new ArrayList<>();
+    public static List<Outline> getOutlinesToDestroy() {
+        List<Outline> outlinesToRemove = new ArrayList<>();
         for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
             Outline outline = entry.getValue();
-            if (!(outline.duration() < 0)) {
-                if (LocalDateTime.now().isAfter(outline.createdTimestamp().plusSeconds((long) outline.duration()))) {
-                    outlinesToRemove.add(entry.getKey());
-                    isBlockListDirty = true;
-                }
+            if (hasOutlineDurationExpired(outline)) {
+                outlinesToRemove.add(outline);
+                isBlockListDirty = true;
             }
 
             if (outline.type() == Outline.Type.ENTITY) {
                 Entity entity = outline.entity();
-                if (!entity.isAlive()) {
-                    outlinesToRemove.add(entry.getKey());
+
+                if (Utils.shouldRemoveOutline(entity)) {
+                    outlinesToRemove.add(entry.getValue());
                 }
             }
         }
 
         return outlinesToRemove;
+    }
+
+    public static List<Outline> getOutlinesToSuspend() {
+        List<Outline> outlinesToSuspend = new ArrayList<>();
+        for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
+            Outline outline = entry.getValue();
+            if (outline.type() == Outline.Type.ENTITY) {
+                Entity entity = outline.entity();
+
+                if (Utils.shouldSuspendOutline(entity)) {
+                    outlinesToSuspend.add(entry.getValue());
+                }
+            }
+        }
+        return outlinesToSuspend;
+    }
+
+    public static boolean hasOutlineDurationExpired(Outline outline) {
+        if (!(outline.duration() < 0)) {
+            return LocalDateTime.now().isAfter(outline.createdTimestamp().plusSeconds((long) outline.duration()));
+        }
+        return false;
     }
 
     public static void calculateMergedOutlines() {
@@ -71,7 +96,7 @@ public class Outliner {
         }
     }
 
-    public static void renderBlockOutlines(ResourceKey<Level> dimension) {
+    public static void renderStaticOutlines(ResourceKey<Level> dimension, PoseStack stack) {
 
         // We need to experiment with many drawcalls vs this merging vertex lists into one buffer performance
 
@@ -95,46 +120,79 @@ public class Outliner {
         for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
             Outline outline = entry.getValue();
             if (!outline.dimension().equals(dimension)) continue;
-            if (!(outline.type() == Outline.Type.BLOCK || outline.type() == Outline.Type.BLOCKGROUP)) continue;
         }
     }
 
-    public static void renderEntityOutlines(ResourceKey<Level> dimension) {
-        //  Each entity outline will need its own draw call to allow live transformations to be used
-        // without affecting the rest of the outlines
-        //  Mark the entity outline as clean
-
+    public static void renderDynamicOutlines(ResourceKey<Level> dimension, PoseStack stack) {
         for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
             Outline outline = entry.getValue();
             if (!outline.dimension().equals(dimension)) continue;
-            if (!(outline.type() == Outline.Type.ENTITY)) continue;
+            OutlineRenderer.renderOutline(outline, stack);
         }
     }
 
     public static void addOutline(Outline outline) {
-        outline.markDirty();
-        OUTLINES.put(outline.key(), outline);
-        if (outline.type().equals(Outline.Type.ENTITY)) {
+        if (outline instanceof MergedOutline mergedOutline) {
+            mergedOutline.markDirty();
+        }
+
+        if (outline.type() == Outline.Type.BLOCK || outline.type() == Outline.Type.BLOCKGROUP) {
             refreshOutlines();
         }
+
+        if (outline.buffer() == null) {
+            outline.populateVertexBuffer();
+        }
+
+        if (outline.type() == Outline.Type.ENTITY) {
+            Set<Outline> outlines =
+                    SUSPENDED_OUTLINES.getOrDefault(outline.entity().getUUID(), new HashSet<>());
+            outlines.remove(outline);
+            SUSPENDED_OUTLINES.put(outline.entity().getUUID(), outlines);
+        }
+        OUTLINES.put(outline.key(), outline);
     }
 
     public static void removeOutline(Outline outline) {
         removeOutline(outline.key());
     }
 
+    public static void suspendOutline(Outline outline) {
+        suspendOutline(outline.key());
+    }
+
     public static void removeOutline(String key) {
         Outline existingOutline = OUTLINES.getOrDefault(key, null);
-        OUTLINES.remove(key);
         if (existingOutline != null) {
-            if (existingOutline.type().equals(Outline.Type.ENTITY)) {
+            if (!SUSPENDED_OUTLINES.containsKey(existingOutline.entity().getUUID())) {
+                existingOutline.cleanup();
+            }
+            OUTLINES.remove(key);
+            if (existingOutline.type() == Outline.Type.BLOCK || existingOutline.type() == Outline.Type.BLOCKGROUP) {
                 refreshOutlines();
             }
         }
     }
 
+    public static void suspendOutline(String key) {
+        Outline existingOutline = OUTLINES.getOrDefault(key, null);
+        if (existingOutline != null) {
+            if (existingOutline.type() == Outline.Type.ENTITY) {
+                Set<Outline> outlines =
+                        SUSPENDED_OUTLINES.getOrDefault(existingOutline.entity().getUUID(), new HashSet<>());
+                outlines.add(existingOutline);
+                SUSPENDED_OUTLINES.put(existingOutline.entity().getUUID(), outlines);
+            }
+        }
+        removeOutline(key);
+    }
+
     public static void removeAllOutlines() {
+        for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
+            entry.getValue().cleanup();
+        }
         OUTLINES.clear();
+        SUSPENDED_OUTLINES.clear();
         refreshOutlines();
     }
 
@@ -142,8 +200,41 @@ public class Outliner {
         return OUTLINES.containsKey(key);
     }
 
-    public static boolean outlineExists(Outline outline) {
-        return outlineExists(outline.key());
+    public static boolean outlineExists(Outline outlineA) {
+        boolean exists = outlineExists(outlineA.key());
+        if (!exists) return false;
+
+        Outline outlineB = getOutline(outlineA.key());
+
+        if (outlineA.type() != outlineB.type()) return false;
+
+        switch (outlineA.type()) {
+            case ENTITY -> {
+                return outlineA.entity().getUUID() == outlineB.entity().getUUID();
+            }
+            case BLOCK -> {
+                return outlineA.blockPos().equals(outlineB.blockPos())
+                        && outlineA.dimension().equals(outlineB.dimension());
+            }
+            case BLOCKGROUP -> {
+                return outlineA.blockPosCollection().equals(outlineB.blockPosCollection())
+                        && outlineA.dimension().equals(outlineB.dimension());
+            }
+            case LINE -> {
+                return outlineA.line().equals(outlineB.line())
+                        && outlineA.dimension().equals(outlineB.dimension());
+            }
+        }
+
+        return false;
+    }
+
+    public static Set<Outline> getDiscardedOutlines(Entity entity) {
+        return SUSPENDED_OUTLINES.getOrDefault(entity.getUUID(), null);
+    }
+
+    public static Outline getOutline(String key) {
+        return OUTLINES.getOrDefault(key, null);
     }
 
     public static void refreshOutlines() {

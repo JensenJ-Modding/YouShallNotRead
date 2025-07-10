@@ -3,10 +3,12 @@
   "package": "net.youshallnotread.mixin",
   "compatibilityLevel": "JAVA_17",
   "minVersion": "0.8",
-  "client": [],
   "mixins": [
   ],
   "injectors": {
     "defaultRequire": 1
-  }
+  },
+  "client": [
+    "EntityRenderDispatcherMixin"
+  ]
 }

@@ -13,6 +13,7 @@ public class MergedOutline extends Outline {
     private final String mergeKey;
     private final AABB collisionBounds;
     private Set<MergedOutline> cachedOverlappingOutlines = new HashSet<>();
+    private boolean dirty;
 
     public MergedOutline(Builder builder) {
         super(builder);
@@ -40,7 +41,7 @@ public class MergedOutline extends Outline {
             if (!(entry.getValue() instanceof MergedOutline outline)) continue;
             if (outline == this) continue;
             if (!this.dimension().equals(outline.dimension())) continue;
-            if (this.collisionBounds().intersects(outline.collisionBounds())) {
+            if (this.collisionBounds().inflate(1).intersects(outline.collisionBounds())) {
                 newCollidingOutlines.add(outline);
             }
         }
@@ -57,6 +58,14 @@ public class MergedOutline extends Outline {
 
     public AABB collisionBounds() {
         return collisionBounds;
+    }
+
+    public void markDirty() {
+        dirty = true;
+    }
+
+    public boolean dirty() {
+        return dirty;
     }
 
     public Set<MergedOutline> cachedOverlappingOutlines() {

@@ -5,6 +5,9 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+
 public class Utils {
 
     public static <T> Set<T> findSymmetricDifference(Set<T> set1, Set<T> set2) {
@@ -23,5 +26,19 @@ public class Utils {
         } else {
             map.put(key, 1);
         }
+    }
+
+    public static boolean shouldRemoveOutline(Entity entity) {
+        if (entity == null) return true;
+        Entity.RemovalReason reason = entity.getRemovalReason();
+        if (reason != null && reason.equals(Entity.RemovalReason.KILLED)) return true;
+        if (entity instanceof LivingEntity living) {
+            return living.isDeadOrDying();
+        }
+        return false;
+    }
+
+    public static boolean shouldSuspendOutline(Entity entity) {
+        return entity.getRemovalReason() != null;
     }
 }
