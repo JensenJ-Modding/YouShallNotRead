@@ -1,7 +1,7 @@
 package net.youshallnotread.fabric;
 
-import net.youshallnotread.YouShallNotRead;
 import net.fabricmc.api.ModInitializer;
+import net.youshallnotread.YouShallNotRead;
 
 public class YouShallNotReadFabric implements ModInitializer {
     @Override

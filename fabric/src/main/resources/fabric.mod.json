@@ -16,6 +16,9 @@
   "entrypoints": {
     "main": [
       "net.youshallnotread.fabric.YouShallNotReadFabric"
+    ],
+    "client": [
+      "net.youshallnotread.fabric.YouShallNotReadFabricClient"
     ]
   },
   "mixins": [
