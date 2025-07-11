@@ -17,6 +17,18 @@ import org.joml.*;
 // This was easier than mixins, and this works with our rendering pipeline
 public class OutlineMeshBuilder {
 
+    public static void buildMesh(Outline outline, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+        switch (outline.type()) {
+            case ENTITY -> OutlineMeshBuilder.buildMesh(
+                    outline.entity(), outline.colour(), outline.thickness(), vertexConsumer);
+            case LINE -> {}
+            case BLOCK -> OutlineMeshBuilder.buildMesh(
+                    outline.blockPos(), outline.colour(), outline.thickness(), vertexConsumer);
+            case BLOCKGROUP -> OutlineMeshBuilder.buildMesh(
+                    outline.blockPosCollection(), outline.colour(), outline.thickness(), vertexConsumer);
+        }
+    }
+
     public static void buildMesh(
             Iterable<BlockPos> positions,
             Vector4f colour,
@@ -33,6 +45,16 @@ public class OutlineMeshBuilder {
             Direction direction = Direction.get(Direction.AxisDirection.POSITIVE, edge.axis);
             buildCuboidLine(vertexConsumer, origin, direction, outlineWidth, colour);
         });
+    }
+
+    public static void buildMesh(
+            BlockPos pos, Vector4f colour, float outlineWidth, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+        if (outlineWidth <= 0) return;
+        buildCuboid(
+                vertexConsumer,
+                pos.getCenter().subtract(0.5, 0.5, 0.5),
+                pos.getCenter().add(0.5, 0.5, 0.5),
+                colour);
     }
 
     public static void buildMesh(

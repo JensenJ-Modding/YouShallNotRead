@@ -2,10 +2,14 @@ package net.youshallnotread;
 
 import java.util.Set;
 
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.level.Level;
+
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.client.ClientPlayerEvent;
-import dev.architectury.event.events.common.BlockEvent;
 import dev.architectury.event.events.common.EntityEvent;
+import dev.architectury.event.events.common.InteractionEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import net.youshallnotread.outline.Outline;
 import net.youshallnotread.outline.Outliner;
@@ -38,17 +42,39 @@ public class YouShallNotReadClient {
             return EventResult.pass();
         });
 
-        BlockEvent.BREAK.register(((level, blockPos, blockState, serverPlayer, intValue) -> {
+        InteractionEvent.RIGHT_CLICK_BLOCK.register(((player, hand, blockPos, face) -> {
+            Level level = player.level();
             if (!level.isClientSide()) return EventResult.pass();
-            Outline outline = new Outline.Builder()
-                    .key("test block")
-                    .duration(-1)
-                    .bounds(blockPos, level.dimension())
-                    .merge(true, "test key")
-                    .build();
+            if (hand == InteractionHand.OFF_HAND) return EventResult.pass();
+            if (!player.isShiftKeyDown()) return EventResult.pass();
 
-            Outliner.addOutline(outline);
-            return EventResult.pass();
+            for (int x = 0; x < 10; x++) {
+                for (int y = 0; y < 10; y++) {
+                    for (int z = 0; z < 10; z++) {
+
+                        BlockPos pos = blockPos.east(x * 2).above(y * 2).south(z * 2);
+                        Outline outline = new Outline.Builder()
+                                .key("test block" + pos)
+                                .duration(-1)
+                                .bounds(pos, level.dimension())
+                                .merge(true, "test key")
+                                .build();
+                        Outliner.addOutline(outline);
+                    }
+                }
+            }
+
+            return EventResult.interruptFalse();
+        }));
+
+        InteractionEvent.LEFT_CLICK_BLOCK.register(((player, hand, blockPos, face) -> {
+            Level level = player.level();
+            if (!level.isClientSide()) return EventResult.pass();
+            if (hand == InteractionHand.OFF_HAND) return EventResult.pass();
+            if (!player.isShiftKeyDown()) return EventResult.pass();
+
+            Outliner.removeAllOutlines();
+            return EventResult.interruptFalse();
         }));
 
         EntityEvent.ADD.register(((entity, level) -> {

@@ -11,13 +11,12 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.Vec3;
 
-import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import it.unimi.dsi.fastutil.Pair;
 import org.joml.Vector4f;
 
-public class Outline {
+public abstract class Outline {
     private final float duration;
     private final String key;
     private final LocalDateTime createdTimestamp;
@@ -25,7 +24,6 @@ public class Outline {
     private final Vector4f colour;
 
     private final Type type;
-    private VertexBuffer vertexBuffer;
 
     private final ResourceKey<Level> dimension;
     private Collection<BlockPos> blockPosCollection;
@@ -50,36 +48,11 @@ public class Outline {
         }
     }
 
-    void populateVertexBuffer() {
-        RenderSystem.assertOnRenderThread();
-        Tesselator tesselator = Tesselator.getInstance();
+    abstract void setupVertexData();
 
-        vertexBuffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
-        BufferBuilder buffer = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
+    abstract boolean hasVertexData();
 
-        switch (this.type()) {
-            case ENTITY -> {
-                OutlineMeshBuilder.buildMesh(
-                        this.entity(), this.colour(), this.thickness(), (position, colour) -> buffer.addVertex(
-                                        (float) position.x, (float) position.y, (float) position.z)
-                                .setColor(colour.x, colour.y, colour.z, colour.w));
-            }
-            case LINE -> {}
-            case BLOCK -> {}
-            case BLOCKGROUP -> {}
-        }
-
-        vertexBuffer.bind();
-        vertexBuffer.upload(buffer.build());
-        VertexBuffer.unbind();
-    }
-
-    void cleanup() {
-        if (vertexBuffer != null) {
-            vertexBuffer.close();
-            vertexBuffer = null;
-        }
-    }
+    abstract void cleanup();
 
     void transform(PoseStack pose) {
         if (this.type() == Type.ENTITY) {
@@ -118,10 +91,6 @@ public class Outline {
 
     public Type type() {
         return type;
-    }
-
-    public VertexBuffer buffer() {
-        return vertexBuffer;
     }
 
     public ResourceKey<Level> dimension() {
@@ -168,7 +137,7 @@ public class Outline {
         boolean showCollisions = false;
         String mergeKey = "";
         private float duration = -1;
-        private float thickness = 1;
+        private float thickness = 0.1f;
         private Vector4f colour = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
         private String key = "";
         private Type type = Type.NONE;
@@ -245,16 +214,23 @@ public class Outline {
             if (key.isEmpty()) {
                 throw new IllegalStateException("Outline must have a key specified");
             }
-            if (type == Type.NONE) {
-                throw new IllegalStateException("Outline must have a type specified");
-            }
-            if (merge) {
-                if (!(type == Type.BLOCK || type == Type.BLOCKGROUP)) {
-                    throw new IllegalStateException("This type of outline does not support merging");
+
+            switch (type) {
+                case NONE -> throw new IllegalStateException("Outline must have a type specified");
+                case BLOCK, BLOCKGROUP -> {
+                    if (merge) {
+                        return new MergedOutline(this);
+                    } else {
+                        return new BatchedOutline(this);
+                    }
                 }
-                return new MergedOutline(this);
+                default -> {
+                    if (merge) {
+                        throw new IllegalStateException("This type of outline does not support merging");
+                    }
+                    return new StandaloneOutline(this);
+                }
             }
-            return new Outline(this);
         }
     }
 }

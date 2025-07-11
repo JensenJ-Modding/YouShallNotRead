@@ -1,2 +1,5 @@
 apply from: 'https://raw.githubusercontent.com/JensenJ-Modding/Mod-Resources/refs/heads/main/1.21.1/Gradle/common-build.gradle'
 
+dependencies {
+    implementation 'org.apache.commons:commons-collections4:4.4'
+}

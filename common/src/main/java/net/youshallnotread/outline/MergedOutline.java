@@ -7,7 +7,7 @@ import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 
-public class MergedOutline extends Outline {
+public class MergedOutline extends BatchedOutline {
 
     private final boolean showCollisions;
     private final String mergeKey;

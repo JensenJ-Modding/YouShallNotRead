@@ -9,6 +9,7 @@ import net.minecraft.world.level.Level;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.youshallnotread.Utils;
+import org.apache.commons.collections4.collection.CompositeCollection;
 
 public class Outliner {
 
@@ -16,9 +17,12 @@ public class Outliner {
 
     static final Map<String, Outline> OUTLINES = new HashMap<>();
     static final Map<UUID, Set<Outline>> SUSPENDED_OUTLINES = new HashMap<>();
+
     private static boolean isBlockListDirty = false;
 
     public static void processOutlines(Level level, PoseStack stack) {
+        // YouShallNotRead.LOGGER.info(OUTLINES);
+
         List<Outline> outlinesToDestroy = getOutlinesToDestroy();
         calculateMergedOutlines();
         outlinesToDestroy.forEach(Outliner::removeOutline);
@@ -27,8 +31,8 @@ public class Outliner {
         outlinesToSuspend.forEach(Outliner::suspendOutline);
 
         ResourceKey<Level> dimension = level.dimension();
-        renderStaticOutlines(dimension, stack);
-        renderDynamicOutlines(dimension, stack);
+        renderBatchedOutlines(dimension, stack);
+        renderStandaloneOutlines(dimension, stack);
     }
 
     public static List<Outline> getOutlinesToDestroy() {
@@ -96,10 +100,7 @@ public class Outliner {
         }
     }
 
-    public static void renderStaticOutlines(ResourceKey<Level> dimension, PoseStack stack) {
-
-        // We need to experiment with many drawcalls vs this merging vertex lists into one buffer performance
-
+    public static void renderBatchedOutlines(ResourceKey<Level> dimension, PoseStack stack) {
         // If list is clean we can use the cached vertex buffer, then return
         //   We need to work out criteria for dirtying the list
         //     changing dimensions
@@ -117,15 +118,34 @@ public class Outliner {
         //    Add this outlines verts to the buffer, we can use cached values if outline was clean
         //  Render the buffer, mark list as clean
 
-        for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
-            Outline outline = entry.getValue();
-            if (!outline.dimension().equals(dimension)) continue;
+        if (isBlockListDirty) {
+            CompositeCollection<BatchedVertexBuffer.OutlineVertex> batchedVertices = new CompositeCollection<>();
+            for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
+                if (!(entry.getValue() instanceof BatchedOutline outline)) continue;
+                if (!outline.dimension().equals(dimension)) continue;
+
+                // if(outline instanceof MergedOutline mergedOutline){
+                //    if(mergedOutline.dirty()){
+                //        mergedOutline.cleanup();
+                //        mergedOutline.setupVertexData();
+                //    }
+                // }
+
+                // TODO: Only add if this outline should render
+                batchedVertices.addComposited(outline.vertices());
+            }
+            BatchedVertexBuffer.cleanup();
+            BatchedVertexBuffer.populateVertexBuffer(batchedVertices);
+            isBlockListDirty = false;
+        }
+        if (BatchedVertexBuffer.hasVertexData()) {
+            OutlineRenderer.renderBatchedOutlines(stack);
         }
     }
 
-    public static void renderDynamicOutlines(ResourceKey<Level> dimension, PoseStack stack) {
+    public static void renderStandaloneOutlines(ResourceKey<Level> dimension, PoseStack stack) {
         for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
-            Outline outline = entry.getValue();
+            if (!(entry.getValue() instanceof StandaloneOutline outline)) continue;
             if (!outline.dimension().equals(dimension)) continue;
             OutlineRenderer.renderOutline(outline, stack);
         }
@@ -136,12 +156,12 @@ public class Outliner {
             mergedOutline.markDirty();
         }
 
-        if (outline.type() == Outline.Type.BLOCK || outline.type() == Outline.Type.BLOCKGROUP) {
+        if (outline instanceof BatchedOutline) {
             refreshOutlines();
         }
 
-        if (outline.buffer() == null) {
-            outline.populateVertexBuffer();
+        if (!outline.hasVertexData()) {
+            outline.setupVertexData();
         }
 
         if (outline.type() == Outline.Type.ENTITY) {
@@ -164,8 +184,10 @@ public class Outliner {
     public static void removeOutline(String key) {
         Outline existingOutline = OUTLINES.getOrDefault(key, null);
         if (existingOutline != null) {
-            if (!SUSPENDED_OUTLINES.containsKey(existingOutline.entity().getUUID())) {
-                existingOutline.cleanup();
+            if (existingOutline.type() == Outline.Type.ENTITY) {
+                if (!SUSPENDED_OUTLINES.containsKey(existingOutline.entity().getUUID())) {
+                    existingOutline.cleanup();
+                }
             }
             OUTLINES.remove(key);
             if (existingOutline.type() == Outline.Type.BLOCK || existingOutline.type() == Outline.Type.BLOCKGROUP) {
@@ -194,6 +216,7 @@ public class Outliner {
         OUTLINES.clear();
         SUSPENDED_OUTLINES.clear();
         refreshOutlines();
+        BatchedVertexBuffer.cleanup();
     }
 
     public static boolean outlineExists(String key) {
