@@ -49,7 +49,7 @@ public class YouShallNotReadClient {
             if (!player.isShiftKeyDown()) return EventResult.pass();
 
             for (int x = 0; x < 10; x++) {
-                for (int y = 0; y < 10; y++) {
+                for (int y = 0; y < 100; y++) {
                     for (int z = 0; z < 10; z++) {
 
                         BlockPos pos = blockPos.east(x * 2).above(y * 2).south(z * 2);

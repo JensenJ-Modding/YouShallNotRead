@@ -9,6 +9,7 @@ import net.minecraft.world.level.Level;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.youshallnotread.Utils;
+import net.youshallnotread.YouShallNotRead;
 import org.apache.commons.collections4.collection.CompositeCollection;
 
 public class Outliner {
@@ -18,29 +19,27 @@ public class Outliner {
     static final Map<String, Outline> OUTLINES = new HashMap<>();
     static final Map<UUID, Set<Outline>> SUSPENDED_OUTLINES = new HashMap<>();
 
-    private static boolean isBlockListDirty = false;
+    private static boolean isBatchedListDirty = false;
 
     public static void processOutlines(Level level, PoseStack stack) {
-        // TODO: Optimise the pre-render part of outline processing, particularly outline merge precalculations
-        List<Outline> outlinesToDestroy = getOutlinesToDestroy();
-        calculateMergedOutlines();
-        outlinesToDestroy.forEach(Outliner::removeOutline);
-
-        List<Outline> outlinesToSuspend = getOutlinesToSuspend();
-        outlinesToSuspend.forEach(Outliner::suspendOutline);
-
+        YouShallNotRead.LOGGER.info("Rendering {} outlines", OUTLINES.size());
+        prepareOutlines();
         ResourceKey<Level> dimension = level.dimension();
         renderBatchedOutlines(dimension, stack);
         renderStandaloneOutlines(dimension, stack);
     }
 
-    public static List<Outline> getOutlinesToDestroy() {
-        List<Outline> outlinesToRemove = new ArrayList<>();
+    public static void prepareOutlines() {
+        Set<Outline> outlinesToRemove = new HashSet<>();
+        Set<Outline> outlinesToSuspend = new HashSet<>();
+        Set<MergedOutline> outlinesToRegenerate = new HashSet<>();
         for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
             Outline outline = entry.getValue();
             if (hasOutlineDurationExpired(outline)) {
                 outlinesToRemove.add(outline);
-                isBlockListDirty = true;
+                if (outline instanceof BatchedOutline) {
+                    isBatchedListDirty = true;
+                }
             }
 
             if (outline.type() == Outline.Type.ENTITY) {
@@ -48,26 +47,30 @@ public class Outliner {
 
                 if (Utils.shouldRemoveOutline(entity)) {
                     outlinesToRemove.add(entry.getValue());
+                    continue;
                 }
-            }
-        }
 
-        return outlinesToRemove;
-    }
-
-    public static List<Outline> getOutlinesToSuspend() {
-        List<Outline> outlinesToSuspend = new ArrayList<>();
-        for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
-            Outline outline = entry.getValue();
-            if (outline.type() == Outline.Type.ENTITY) {
-                Entity entity = outline.entity();
-
-                if (Utils.shouldSuspendOutline(entity)) {
+                if (Utils.shouldSuspendOutline(entity) && !outlinesToRemove.contains(outline)) {
                     outlinesToSuspend.add(entry.getValue());
+                    continue;
                 }
             }
+
+            if (!isBatchedListDirty) continue;
+            if (!(outline instanceof MergedOutline mergedOutline)) continue;
+            if (!mergedOutline.dirty()) continue;
+
+            if (mergedOutline.hasMergedOutlinesChanged()) {
+                outlinesToRegenerate.add(mergedOutline);
+            }
         }
-        return outlinesToSuspend;
+
+        outlinesToRemove.forEach(Outliner::removeOutline);
+        outlinesToSuspend.forEach(Outliner::suspendOutline);
+        outlinesToRegenerate.forEach(outline -> {
+            outline.cleanup();
+            outline.setupVertexData();
+        });
     }
 
     public static boolean hasOutlineDurationExpired(Outline outline) {
@@ -75,28 +78,6 @@ public class Outliner {
             return LocalDateTime.now().isAfter(outline.createdTimestamp().plusSeconds((long) outline.duration()));
         }
         return false;
-    }
-
-    public static void calculateMergedOutlines() {
-        if (!isBlockListDirty) return;
-
-        Set<MergedOutline> outlinesToRecalculate = new HashSet<>();
-        for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
-            if (!(entry.getValue() instanceof MergedOutline outline)) continue;
-            if (!outline.dirty()) continue;
-
-            Set<MergedOutline> newOverlappingOutlines = outline.calculateOverlappingOutlines();
-            if (newOverlappingOutlines.equals(outline.cachedOverlappingOutlines())) continue;
-
-            outlinesToRecalculate.addAll(
-                    Utils.findSymmetricDifference(newOverlappingOutlines, outline.cachedOverlappingOutlines()));
-            outline.updateCachedOverlappingOutlines(newOverlappingOutlines);
-        }
-
-        for (MergedOutline outline : outlinesToRecalculate) {
-            outline.markDirty();
-            outline.updateCachedOverlappingOutlines(outline.calculateOverlappingOutlines());
-        }
     }
 
     public static void renderBatchedOutlines(ResourceKey<Level> dimension, PoseStack stack) {
@@ -117,7 +98,7 @@ public class Outliner {
         //    Add this outlines verts to the buffer, we can use cached values if outline was clean
         //  Render the buffer, mark list as clean
 
-        if (isBlockListDirty) {
+        if (isBatchedListDirty) {
             CompositeCollection<BatchedVertexBuffer.OutlineVertex> batchedVertices = new CompositeCollection<>();
             for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
                 if (!(entry.getValue() instanceof BatchedOutline outline)) continue;
@@ -135,7 +116,7 @@ public class Outliner {
             }
             BatchedVertexBuffer.cleanup();
             BatchedVertexBuffer.populateVertexBuffer(batchedVertices);
-            isBlockListDirty = false;
+            isBatchedListDirty = false;
         }
         if (BatchedVertexBuffer.hasVertexData()) {
             OutlineRenderer.renderBatchedOutlines(stack);
@@ -188,10 +169,14 @@ public class Outliner {
                     existingOutline.cleanup();
                 }
             }
-            OUTLINES.remove(key);
-            if (existingOutline.type() == Outline.Type.BLOCK || existingOutline.type() == Outline.Type.BLOCKGROUP) {
+            if (existingOutline instanceof BatchedOutline) {
                 refreshOutlines();
             }
+
+            if (existingOutline instanceof MergedOutline mergedOutline) {
+                mergedOutline.markDirty();
+            }
+            OUTLINES.remove(key);
         }
     }
 
@@ -260,6 +245,6 @@ public class Outliner {
     }
 
     public static void refreshOutlines() {
-        isBlockListDirty = true;
+        isBatchedListDirty = true;
     }
 }

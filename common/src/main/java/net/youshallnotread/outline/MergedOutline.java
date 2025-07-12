@@ -13,7 +13,7 @@ public class MergedOutline extends BatchedOutline {
     private final String mergeKey;
     private final AABB collisionBounds;
     private Set<MergedOutline> cachedOverlappingOutlines = new HashSet<>();
-    private boolean dirty;
+    private static final Set<MergedOutline> dirtyOutlines = new HashSet<>();
 
     public MergedOutline(Builder builder) {
         super(builder);
@@ -35,17 +35,27 @@ public class MergedOutline extends BatchedOutline {
         }
     }
 
-    public Set<MergedOutline> calculateOverlappingOutlines() {
+    @Override
+    void setupVertexData() {
+        super.setupVertexData();
+        dirtyOutlines.remove(this);
+    }
+
+    public boolean hasMergedOutlinesChanged() {
         Set<MergedOutline> newCollidingOutlines = new HashSet<>();
         for (Map.Entry<String, Outline> entry : Outliner.OUTLINES.entrySet()) {
             if (!(entry.getValue() instanceof MergedOutline outline)) continue;
             if (outline == this) continue;
             if (!this.dimension().equals(outline.dimension())) continue;
+            // TODO: Modify this so it only checks the 6 directly adjacent blocks, not diagonals
             if (this.collisionBounds().inflate(1).intersects(outline.collisionBounds())) {
                 newCollidingOutlines.add(outline);
             }
         }
-        return newCollidingOutlines;
+
+        boolean isEqual = newCollidingOutlines.equals(cachedOverlappingOutlines);
+        cachedOverlappingOutlines = newCollidingOutlines;
+        return !isEqual;
     }
 
     public String mergeKey() {
@@ -61,18 +71,21 @@ public class MergedOutline extends BatchedOutline {
     }
 
     public void markDirty() {
-        dirty = true;
+        dirtyOutlines.add(this);
+        for (MergedOutline outline : cachedOverlappingOutlines) {
+            if (dirtyOutlines.contains(outline)) continue;
+            outline.markDirty();
+        }
     }
 
     public boolean dirty() {
-        return dirty;
+        return dirtyOutlines.contains(this);
     }
 
-    public Set<MergedOutline> cachedOverlappingOutlines() {
-        return cachedOverlappingOutlines;
-    }
-
-    public void updateCachedOverlappingOutlines(Set<MergedOutline> outlines) {
-        cachedOverlappingOutlines = outlines;
+    @Override
+    public void cleanup() {
+        super.cleanup();
+        dirtyOutlines.remove(this);
+        cachedOverlappingOutlines.clear();
     }
 }
