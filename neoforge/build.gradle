@@ -5,5 +5,5 @@ plugins {
 apply from: 'https://raw.githubusercontent.com/JensenJ-Modding/Mod-Resources/refs/heads/main/1.21.1/Gradle/neoforge-build.gradle'
 
 dependencies {
-    forgeRuntimeLibrary 'org.apache.commons:commons-collections4:4.4'
+    forgeRuntimeLibrary(include'org.apache.commons:commons-collections4:4.4')
 }

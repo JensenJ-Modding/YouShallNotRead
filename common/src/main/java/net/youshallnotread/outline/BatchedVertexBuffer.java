@@ -22,7 +22,6 @@ public class BatchedVertexBuffer {
         vertexBuffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
         BufferBuilder buffer = tesselator.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.POSITION_COLOR);
 
-        // TODO: Optimise this
         for (OutlineVertex vertex : vertices) {
             buffer.addVertex((float) vertex.position.x, (float) vertex.position.y, (float) vertex.position.z)
                     .setColor(vertex.colour.x, vertex.colour.y, vertex.colour.z, vertex.colour.w);

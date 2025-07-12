@@ -4,3 +4,6 @@ plugins {
 
 apply from: 'https://raw.githubusercontent.com/JensenJ-Modding/Mod-Resources/refs/heads/main/1.21.1/Gradle/fabric-build.gradle'
 
+dependencies {
+    include 'org.apache.commons:commons-collections4:4.4'
+}

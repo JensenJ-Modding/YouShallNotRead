@@ -21,8 +21,7 @@ public class Outliner {
     private static boolean isBlockListDirty = false;
 
     public static void processOutlines(Level level, PoseStack stack) {
-        // YouShallNotRead.LOGGER.info(OUTLINES);
-
+        // TODO: Optimise the pre-render part of outline processing, particularly outline merge precalculations
         List<Outline> outlinesToDestroy = getOutlinesToDestroy();
         calculateMergedOutlines();
         outlinesToDestroy.forEach(Outliner::removeOutline);
