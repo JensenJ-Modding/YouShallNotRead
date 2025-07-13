@@ -29,22 +29,23 @@ public class YouShallNotReadClient {
                     .mul(0.55f)
                     .mul(0.5f);
 
-            for (int x = 0; x < 1; x++) {
-                for (int y = 0; y < 1; y++) {
-                    for (int z = 0; z < 1; z++) {
-                        Outline outline = new Outline.Builder()
-                                .key("test entity:" + x + "," + y + "," + z)
-                                .duration(-1)
-                                .bounds(entity)
-                                .thickness(0.05f)
-                                .inflation(inflation)
-                                .colour(Utils.RBGAFromInt(0xDB4031FF))
-                                .build();
-                        if (!Outliner.outlineExists(outline)) {
-                            Outliner.addOutline(outline);
-                        }
-                    }
-                }
+            Outline outline = new Outline.Builder()
+                    .key("test entity")
+                    .duration(-1)
+                    .bounds(entity)
+                    .thickness(0.05f)
+                    .inflation(inflation)
+                    .onChanged((oldOutline, newOutline) -> YouShallNotRead.LOGGER.info("Changed outline"))
+                    .onRemoved(outline1 -> YouShallNotRead.LOGGER.info("Removed outline"))
+                    .onSuspended(outline1 -> YouShallNotRead.LOGGER.info("Suspended outline"))
+                    .onUnsuspended(outline1 -> YouShallNotRead.LOGGER.info("Unsuspended outline"))
+                    .removeIf((outline1) -> outline1.entity().position().y < 0)
+                    .regenerateIf((outline1) -> outline1.entity().isOnFire())
+                    .colour(Utils.RBGAFromInt(0xDB4031FF))
+                    .build();
+
+            if (!Outliner.outlineExists(outline)) {
+                Outliner.addOutline(outline);
             }
 
             return EventResult.pass();
@@ -88,7 +89,7 @@ public class YouShallNotReadClient {
         EntityEvent.ADD.register(((entity, level) -> {
             if (!level.isClientSide()) return EventResult.pass();
 
-            Set<Outline> outlines = Outliner.getDiscardedOutlines(entity);
+            Set<Outline> outlines = Outliner.getSuspendedOutlines(entity);
             if (outlines == null) return EventResult.pass();
             for (Outline outline : outlines) {
                 outline.setEntity(entity);

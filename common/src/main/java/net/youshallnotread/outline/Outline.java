@@ -2,6 +2,9 @@ package net.youshallnotread.outline;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -33,6 +36,13 @@ public abstract class Outline {
     private Pair<Vec3, Vec3> line;
     private Entity entity;
 
+    private final BiConsumer<Outline, Outline> onChangedCallback;
+    private final Consumer<Outline> onRemoveCallback;
+    private final Consumer<Outline> onSuspendCallback;
+    private final Consumer<Outline> onUnsuspendCallback;
+    private final Function<Outline, Boolean> removeIfCallback;
+    private final Function<Outline, Boolean> regenerateIfCallback;
+
     public Outline(Builder builder) {
         this.key = builder.key;
         this.duration = builder.duration;
@@ -42,6 +52,12 @@ public abstract class Outline {
         this.inflation = builder.inflation;
         this.type = builder.type;
         this.dimension = builder.dimension;
+        this.onChangedCallback = builder.onChangedCallback;
+        this.onRemoveCallback = builder.onRemoveCallback;
+        this.onSuspendCallback = builder.onSuspendCallback;
+        this.onUnsuspendCallback = builder.onUnsuspendCallback;
+        this.removeIfCallback = builder.removeIfCallback;
+        this.regenerateIfCallback = builder.regenerateIfCallback;
 
         switch (this.type) {
             case ENTITY -> this.entity = builder.entity;
@@ -126,6 +142,30 @@ public abstract class Outline {
         return entity;
     }
 
+    public BiConsumer<Outline, Outline> onChangedCallback() {
+        return onChangedCallback;
+    }
+
+    public Consumer<Outline> onRemoveCallback() {
+        return onRemoveCallback;
+    }
+
+    public Consumer<Outline> onSuspendCallback() {
+        return onSuspendCallback;
+    }
+
+    public Consumer<Outline> onUnsuspendCallback() {
+        return onUnsuspendCallback;
+    }
+
+    public Function<Outline, Boolean> removeIfCallback() {
+        return removeIfCallback;
+    }
+
+    public Function<Outline, Boolean> regenerateIfCallback() {
+        return regenerateIfCallback;
+    }
+
     public Pair<Vec3, Vec3> line() {
         return line;
     }
@@ -149,6 +189,12 @@ public abstract class Outline {
         private Vector4f colour = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
         private String key = "";
         private Type type = Type.NONE;
+        private BiConsumer<Outline, Outline> onChangedCallback = null;
+        private Consumer<Outline> onRemoveCallback = null;
+        private Consumer<Outline> onSuspendCallback = null;
+        private Consumer<Outline> onUnsuspendCallback = null;
+        private Function<Outline, Boolean> removeIfCallback = null;
+        private Function<Outline, Boolean> regenerateIfCallback = null;
 
         protected ResourceKey<Level> dimension = null;
         protected Collection<BlockPos> blockPosCollection = null;
@@ -220,6 +266,36 @@ public abstract class Outline {
 
         public Builder key(String key) {
             this.key = key;
+            return this;
+        }
+
+        public Builder onChanged(BiConsumer<Outline, Outline> onChangedCallback) {
+            this.onChangedCallback = onChangedCallback;
+            return this;
+        }
+
+        public Builder onRemoved(Consumer<Outline> onRemoveCallback) {
+            this.onRemoveCallback = onRemoveCallback;
+            return this;
+        }
+
+        public Builder onSuspended(Consumer<Outline> onSuspendCallback) {
+            this.onSuspendCallback = onSuspendCallback;
+            return this;
+        }
+
+        public Builder onUnsuspended(Consumer<Outline> onUnsuspendCallback) {
+            this.onUnsuspendCallback = onUnsuspendCallback;
+            return this;
+        }
+
+        public Builder removeIf(Function<Outline, Boolean> removeIfCallback) {
+            this.removeIfCallback = removeIfCallback;
+            return this;
+        }
+
+        public Builder regenerateIf(Function<Outline, Boolean> regenerateIfCallback) {
+            this.regenerateIfCallback = regenerateIfCallback;
             return this;
         }
 

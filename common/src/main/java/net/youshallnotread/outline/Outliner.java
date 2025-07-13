@@ -2,6 +2,9 @@ package net.youshallnotread.outline;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.BiConsumer;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.world.entity.Entity;
@@ -9,7 +12,6 @@ import net.minecraft.world.level.Level;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import net.youshallnotread.Utils;
-import net.youshallnotread.YouShallNotRead;
 import org.apache.commons.collections4.collection.CompositeCollection;
 
 public class Outliner {
@@ -22,7 +24,7 @@ public class Outliner {
     private static boolean isBatchedListDirty = false;
 
     public static void processOutlines(Level level, PoseStack stack) {
-        YouShallNotRead.LOGGER.info("Rendering {} outlines", OUTLINES.size());
+        // YouShallNotRead.LOGGER.info("Rendering {} outlines", OUTLINES.size());
         prepareOutlines();
         ResourceKey<Level> dimension = level.dimension();
         renderBatchedOutlines(dimension, stack);
@@ -32,10 +34,11 @@ public class Outliner {
     public static void prepareOutlines() {
         Set<Outline> outlinesToRemove = new HashSet<>();
         Set<Outline> outlinesToSuspend = new HashSet<>();
-        Set<MergedOutline> outlinesToRegenerate = new HashSet<>();
+        Set<Outline> outlinesToRegenerate = new HashSet<>();
         for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
             Outline outline = entry.getValue();
-            if (hasOutlineDurationExpired(outline)) {
+            Function<Outline, Boolean> removeIf = outline.removeIfCallback();
+            if (hasOutlineDurationExpired(outline) || (removeIf != null && removeIf.apply(outline))) {
                 outlinesToRemove.add(outline);
                 if (outline instanceof BatchedOutline) {
                     isBatchedListDirty = true;
@@ -54,6 +57,12 @@ public class Outliner {
                     outlinesToSuspend.add(entry.getValue());
                     continue;
                 }
+            }
+
+            Function<Outline, Boolean> regenIf = outline.regenerateIfCallback();
+            if (regenIf != null && regenIf.apply(outline)) {
+                outlinesToRegenerate.add(outline);
+                continue;
             }
 
             if (!isBatchedListDirty) continue;
@@ -147,17 +156,36 @@ public class Outliner {
         if (outline.type() == Outline.Type.ENTITY) {
             Set<Outline> outlines =
                     SUSPENDED_OUTLINES.getOrDefault(outline.entity().getUUID(), new HashSet<>());
+
+            Consumer<Outline> consumer = outline.onUnsuspendCallback();
+            if (consumer != null && outlines.contains(outline)) consumer.accept(outline);
+
             outlines.remove(outline);
             SUSPENDED_OUTLINES.put(outline.entity().getUUID(), outlines);
         }
+
+        // FIXME: Currently if an outline is suspended, the changed callback does not trigger.
+        //  Also, in the event an outline is added which has a key within the suspended outlines list,
+        //  the outline within suspended outlines is not removed, meaning upon unsuspension, it can overwrite a newer
+        // outline.
+        if (OUTLINES.containsKey(outline.key())) {
+            Outline oldOutline = OUTLINES.get(outline.key());
+            BiConsumer<Outline, Outline> consumer = oldOutline.onChangedCallback();
+            if (consumer != null) consumer.accept(oldOutline, outline);
+        }
+
         OUTLINES.put(outline.key(), outline);
     }
 
     public static void removeOutline(Outline outline) {
+        Consumer<Outline> consumer = outline.onRemoveCallback();
+        if (consumer != null) consumer.accept(outline);
         removeOutline(outline.key());
     }
 
     public static void suspendOutline(Outline outline) {
+        Consumer<Outline> consumer = outline.onSuspendCallback();
+        if (consumer != null) consumer.accept(outline);
         suspendOutline(outline.key());
     }
 
@@ -236,7 +264,7 @@ public class Outliner {
         return false;
     }
 
-    public static Set<Outline> getDiscardedOutlines(Entity entity) {
+    public static Set<Outline> getSuspendedOutlines(Entity entity) {
         return SUSPENDED_OUTLINES.getOrDefault(entity.getUUID(), null);
     }
 
