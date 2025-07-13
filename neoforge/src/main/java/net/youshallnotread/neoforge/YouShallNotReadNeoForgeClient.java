@@ -21,7 +21,7 @@ public class YouShallNotReadNeoForgeClient {
 
     @SubscribeEvent
     public static void handleWorldRender(RenderLevelStageEvent event) {
-        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_CUTOUT_BLOCKS) {
+        if (event.getStage() == RenderLevelStageEvent.Stage.AFTER_ENTITIES) {
             Outliner.processOutlines(event.getCamera().getEntity().level(), event.getPoseStack());
         }
     }

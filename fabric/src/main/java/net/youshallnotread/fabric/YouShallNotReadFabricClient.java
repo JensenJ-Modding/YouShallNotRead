@@ -10,7 +10,7 @@ public class YouShallNotReadFabricClient implements ClientModInitializer {
     @Override
     public void onInitializeClient() {
         YouShallNotReadClient.init();
-        WorldRenderEvents.BEFORE_ENTITIES.register(
+        WorldRenderEvents.AFTER_ENTITIES.register(
                 (context) -> Outliner.processOutlines(context.world(), context.matrixStack()));
     }
 }
