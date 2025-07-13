@@ -14,6 +14,7 @@ import net.minecraft.world.phys.Vec3;
 import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import it.unimi.dsi.fastutil.Pair;
+import org.joml.Vector3f;
 import org.joml.Vector4f;
 
 public abstract class Outline {
@@ -22,6 +23,7 @@ public abstract class Outline {
     private final LocalDateTime createdTimestamp;
     private final float thickness;
     private final Vector4f colour;
+    private final Vector3f inflation;
 
     private final Type type;
 
@@ -37,6 +39,7 @@ public abstract class Outline {
         this.createdTimestamp = LocalDateTime.now();
         this.colour = builder.colour;
         this.thickness = builder.thickness;
+        this.inflation = builder.inflation;
         this.type = builder.type;
         this.dimension = builder.dimension;
 
@@ -83,6 +86,10 @@ public abstract class Outline {
 
     public float thickness() {
         return thickness;
+    }
+
+    public Vector3f inflation() {
+        return inflation;
     }
 
     public Vector4f colour() {
@@ -138,6 +145,7 @@ public abstract class Outline {
         String mergeKey = "";
         private float duration = -1;
         private float thickness = 0.1f;
+        private Vector3f inflation = new Vector3f(0);
         private Vector4f colour = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
         private String key = "";
         private Type type = Type.NONE;
@@ -197,6 +205,11 @@ public abstract class Outline {
 
         public Builder thickness(float thickness) {
             this.thickness = thickness;
+            return this;
+        }
+
+        public Builder inflation(Vector3f inflation) {
+            this.inflation = inflation;
             return this;
         }
 

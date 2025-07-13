@@ -5,6 +5,7 @@ import java.util.Set;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.AABB;
 
 import dev.architectury.event.EventResult;
 import dev.architectury.event.events.client.ClientPlayerEvent;
@@ -13,7 +14,7 @@ import dev.architectury.event.events.common.InteractionEvent;
 import dev.architectury.event.events.common.PlayerEvent;
 import net.youshallnotread.outline.Outline;
 import net.youshallnotread.outline.Outliner;
-import org.joml.Vector4f;
+import org.joml.Vector3f;
 
 public class YouShallNotReadClient {
 
@@ -23,6 +24,11 @@ public class YouShallNotReadClient {
         PlayerEvent.ATTACK_ENTITY.register((player, level, entity, interactionHand, entityHitResult) -> {
             if (!level.isClientSide()) return EventResult.pass();
 
+            AABB bb = entity.getBoundingBox();
+            Vector3f inflation = new Vector3f((float) bb.getXsize(), (float) bb.getYsize(), (float) bb.getZsize())
+                    .mul(0.55f)
+                    .mul(0.5f);
+
             for (int x = 0; x < 1; x++) {
                 for (int y = 0; y < 1; y++) {
                     for (int z = 0; z < 1; z++) {
@@ -30,7 +36,9 @@ public class YouShallNotReadClient {
                                 .key("test entity:" + x + "," + y + "," + z)
                                 .duration(-1)
                                 .bounds(entity)
-                                .colour(new Vector4f(0.5f, 0.7f, 0.7f, 0.5f))
+                                .thickness(0.05f)
+                                .inflation(inflation)
+                                .colour(Utils.RBGAFromInt(0xDB4031FF))
                                 .build();
                         if (!Outliner.outlineExists(outline)) {
                             Outliner.addOutline(outline);

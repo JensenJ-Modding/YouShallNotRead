@@ -12,16 +12,18 @@ import net.minecraft.world.phys.Vec3;
 
 import org.joml.*;
 
-// NOTE: A lot of this code is copied, pasted and modified from the Catnip Library for Create / Ponder
-// I would have used the lib directly as we already have it included for Ponder, but they were private classes
-// This was easier than mixins, and this works with our rendering pipeline
 public class OutlineMeshBuilder {
 
     public static void buildMesh(Outline outline, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
         switch (outline.type()) {
             case ENTITY -> OutlineMeshBuilder.buildMesh(
-                    outline.entity(), outline.colour(), outline.thickness(), vertexConsumer);
-            case LINE -> {}
+                    outline.entity(), outline.colour(), outline.thickness(), outline.inflation(), vertexConsumer);
+            case LINE -> OutlineMeshBuilder.buildLine(
+                    outline.line().first(),
+                    outline.line().second(),
+                    outline.colour(),
+                    outline.thickness(),
+                    vertexConsumer);
             case BLOCK -> OutlineMeshBuilder.buildMesh(
                     outline.blockPos(), outline.colour(), outline.thickness(), vertexConsumer);
             case BLOCKGROUP -> OutlineMeshBuilder.buildMesh(
@@ -58,11 +60,46 @@ public class OutlineMeshBuilder {
     }
 
     public static void buildMesh(
-            Entity entity, Vector4f colour, float outlineWidth, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
-        if (outlineWidth <= 0) return;
-        AABB boundingBox = entity.getBoundingBox()
+            Entity entity,
+            Vector4f colour,
+            float thickness,
+            Vector3f outlineInflation,
+            BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+        if (thickness <= 0) return;
+        AABB bb = entity.getBoundingBox()
+                .inflate(outlineInflation.x, outlineInflation.y, outlineInflation.z)
                 .move(new Vec3(entity.getX(), entity.getY(), entity.getZ()).multiply(-1, -1, -1));
-        buildCuboid(vertexConsumer, boundingBox.getMinPosition(), boundingBox.getMaxPosition(), colour);
+
+        Vec3[] corners = getCornerPositions(bb);
+
+        int[][] edges = new int[][] {
+            {0, 1}, {0, 2},
+            {0, 4}, {1, 3},
+            {1, 5}, {2, 3},
+            {2, 6}, {3, 7},
+            {4, 5}, {4, 6},
+            {5, 7}, {6, 7},
+        };
+
+        for (int[] edge : edges) {
+            buildLine(corners[edge[0]], corners[edge[1]], colour, thickness, vertexConsumer);
+        }
+    }
+
+    private static Vec3[] getCornerPositions(AABB bb) {
+        Vec3 min = bb.getMinPosition();
+        Vec3 max = bb.getMaxPosition();
+
+        return new Vec3[] {
+            new Vec3(min.x, min.y, min.z),
+            new Vec3(max.x, min.y, min.z),
+            new Vec3(min.x, max.y, min.z),
+            new Vec3(max.x, max.y, min.z),
+            new Vec3(min.x, min.y, max.z),
+            new Vec3(max.x, min.y, max.z),
+            new Vec3(min.x, max.y, max.z),
+            new Vec3(max.x, max.y, max.z),
+        };
     }
 
     private static void buildCuboidLine(
@@ -85,6 +122,33 @@ public class OutlineMeshBuilder {
         }
 
         buildCuboid(vertexConsumer, minPos, maxPos, colour);
+    }
+
+    private static void buildLine(
+            Vec3 start, Vec3 end, Vector4f colour, float thickness, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+        Vec3 dir = end.subtract(start);
+        Vec3 norm = dir.normalize();
+        Vec3 offset = norm.scale(thickness / 2.0);
+
+        Vec3 newStart = start.subtract(offset);
+        Vec3 newEnd = end.add(offset);
+
+        double minX = java.lang.Math.min(newStart.x, newEnd.x);
+        double minY = java.lang.Math.min(newStart.y, newEnd.y);
+        double minZ = java.lang.Math.min(newStart.z, newEnd.z);
+        double maxX = java.lang.Math.max(newStart.x, newEnd.x);
+        double maxY = java.lang.Math.max(newStart.y, newEnd.y);
+        double maxZ = java.lang.Math.max(newStart.z, newEnd.z);
+
+        double dx = maxX - minX == 0 ? thickness : 0;
+        double dy = maxY - minY == 0 ? thickness : 0;
+        double dz = maxZ - minZ == 0 ? thickness : 0;
+
+        buildCuboid(
+                vertexConsumer,
+                new Vec3(minX - dx / 2, minY - dy / 2, minZ - dz / 2),
+                new Vec3(maxX + dx / 2, maxY + dy / 2, maxZ + dz / 2),
+                colour);
     }
 
     private static void buildCuboid(
