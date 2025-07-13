@@ -1,5 +1,6 @@
 package net.youshallnotread;
 
+import java.util.HashSet;
 import java.util.Set;
 
 import net.minecraft.core.BlockPos;
@@ -35,13 +36,14 @@ public class YouShallNotReadClient {
                     .bounds(entity)
                     .thickness(0.05f)
                     .inflation(inflation)
+                    .greedy()
                     .onChanged((oldOutline, newOutline) -> YouShallNotRead.LOGGER.info("Changed outline"))
                     .onRemoved(outline1 -> YouShallNotRead.LOGGER.info("Removed outline"))
                     .onSuspended(outline1 -> YouShallNotRead.LOGGER.info("Suspended outline"))
                     .onUnsuspended(outline1 -> YouShallNotRead.LOGGER.info("Unsuspended outline"))
                     .removeIf((outline1) -> outline1.entity().position().y < 0)
                     .regenerateIf((outline1) -> outline1.entity().isOnFire())
-                    .colour(Utils.RBGAFromInt(0xDB4031FF))
+                    .colour(Utils.RBGFromInt(0xDB4031))
                     .build();
 
             if (!Outliner.outlineExists(outline)) {
@@ -57,21 +59,40 @@ public class YouShallNotReadClient {
             if (hand == InteractionHand.OFF_HAND) return EventResult.pass();
             if (!player.isShiftKeyDown()) return EventResult.pass();
 
-            for (int x = 0; x < 10; x++) {
-                for (int y = 0; y < 100; y++) {
-                    for (int z = 0; z < 10; z++) {
+            BlockPos center = new BlockPos(50, 50, 50);
+            int radius = 50;
+            int innerRadius = 25;
+            int radiusSq = radius * radius;
+            int innerRadiusSq = innerRadius * innerRadius;
+            Set<BlockPos> blockPositions = new HashSet<>();
 
-                        BlockPos pos = blockPos.east(x * 2).above(y * 2).south(z * 2);
-                        Outline outline = new Outline.Builder()
-                                .key("test block" + pos)
-                                .duration(-1)
-                                .bounds(pos, level.dimension())
-                                .merge(true, "test key")
-                                .build();
-                        Outliner.addOutline(outline);
+            for (int x = 0; x < 100; x++) {
+                for (int y = 0; y < 100; y++) {
+                    for (int z = 0; z < 100; z++) {
+                        int dx = x - center.getX();
+                        int dy = y - center.getY();
+                        int dz = z - center.getZ();
+
+                        int dist = dx * dx + dy * dy + dz * dz;
+                        if (dist < innerRadiusSq) {
+                            continue;
+                        }
+
+                        if (dist < radiusSq) {
+                            blockPositions.add(blockPos.offset(x, y, z));
+                        }
                     }
                 }
             }
+
+            Outline outline = new Outline.Builder()
+                    .key("test block")
+                    .duration(-1)
+                    .bounds(blockPositions, level.dimension())
+                    .merge(true, "test key")
+                    .colour(Utils.RBGFromInt(0xEBD457))
+                    .build();
+            Outliner.addOutline(outline);
 
             return EventResult.interruptFalse();
         }));

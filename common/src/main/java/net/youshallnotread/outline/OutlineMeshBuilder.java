@@ -1,7 +1,6 @@
 package net.youshallnotread.outline;
 
-import java.util.HashSet;
-import java.util.Set;
+import java.util.*;
 import java.util.function.BiConsumer;
 
 import net.minecraft.core.BlockPos;
@@ -12,7 +11,19 @@ import net.minecraft.world.phys.Vec3;
 
 import org.joml.*;
 
+// Credit: A lot of the code in this class, particularly to do with the mesh building for merged outlines is from the
+// Ponder Library that Create uses.
+// It's been modified somewhat to work more closely to our renderer here.
 public class OutlineMeshBuilder {
+
+    private static final int[][] EDGES = new int[][] {
+        {0, 1}, {0, 2},
+        {0, 4}, {1, 3},
+        {1, 5}, {2, 3},
+        {2, 6}, {3, 7},
+        {4, 5}, {4, 6},
+        {5, 7}, {6, 7},
+    };
 
     public static void buildMesh(Outline outline, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
         switch (outline.type()) {
@@ -27,36 +38,78 @@ public class OutlineMeshBuilder {
             case BLOCK -> OutlineMeshBuilder.buildMesh(
                     outline.blockPos(), outline.colour(), outline.thickness(), vertexConsumer);
             case BLOCKGROUP -> OutlineMeshBuilder.buildMesh(
-                    outline.blockPosCollection(), outline.colour(), outline.thickness(), vertexConsumer);
+                    outline.blockPosCollection(),
+                    outline.colour(),
+                    outline.thickness(),
+                    outline.greedy(),
+                    vertexConsumer);
         }
     }
 
     public static void buildMesh(
-            Iterable<BlockPos> positions,
+            Set<BlockPos> positions,
             Vector4f colour,
             float outlineWidth,
+            boolean greedy,
             BiConsumer<Vector3d, Vector4f> vertexConsumer) {
         Cluster cluster = new Cluster();
         positions.forEach(cluster::include);
 
         if (outlineWidth <= 0) return;
-        if (cluster.isEmpty()) return;
-        cluster.visibleEdges.forEach(edge -> {
-            BlockPos pos = edge.pos;
-            Vec3 origin = new Vec3(pos.getX(), pos.getY(), pos.getZ());
-            Direction direction = Direction.get(Direction.AxisDirection.POSITIVE, edge.axis);
-            buildCuboidLine(vertexConsumer, origin, direction, outlineWidth, colour);
-        });
+
+        if (greedy) {
+            Map<Direction.Axis, List<BlockPos>> byAxis = new EnumMap<>(Direction.Axis.class);
+            for (MergeEntry entry : cluster.visibleEdges) {
+                byAxis.computeIfAbsent(entry.axis, a -> new ArrayList<>()).add(entry.pos);
+            }
+
+            for (var axis : Direction.Axis.values()) {
+                List<BlockPos> edges = byAxis.get(axis);
+                if (edges == null) continue;
+
+                edges.sort(Comparator.comparingInt((ob) -> ((BlockPos) ob).getX())
+                        .thenComparingInt((ob) -> ((BlockPos) ob).getY())
+                        .thenComparingInt((ob) -> ((BlockPos) ob).getZ()));
+
+                Set<BlockPos> visited = new HashSet<>();
+                for (BlockPos start : edges) {
+                    if (!visited.add(start)) continue;
+
+                    BlockPos end = start;
+                    Direction dir =
+                            switch (axis) {
+                                case X -> Direction.EAST;
+                                case Y -> Direction.UP;
+                                case Z -> Direction.SOUTH;
+                            };
+
+                    while (true) {
+                        BlockPos next = end.relative(dir);
+                        if (!edges.contains(next) || !visited.add(next)) break;
+                        end = next;
+                    }
+
+                    Vec3 startVec = new Vec3(start.getX(), start.getY(), start.getZ());
+                    BlockPos endOffset = end.offset(dir.getNormal());
+                    Vec3 endVec = new Vec3(endOffset.getX(), endOffset.getY(), endOffset.getZ());
+                    buildLine(startVec, endVec, colour, outlineWidth, vertexConsumer);
+                }
+            }
+        } else {
+            cluster.visibleEdges.forEach(edge -> {
+                BlockPos pos = edge.pos;
+                Vec3 origin = new Vec3(pos.getX(), pos.getY(), pos.getZ());
+                Direction direction = Direction.get(Direction.AxisDirection.POSITIVE, edge.axis);
+                buildLine(vertexConsumer, origin, direction, outlineWidth, colour);
+            });
+        }
     }
 
     public static void buildMesh(
-            BlockPos pos, Vector4f colour, float outlineWidth, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
-        if (outlineWidth <= 0) return;
-        buildCuboid(
-                vertexConsumer,
-                pos.getCenter().subtract(0.5, 0.5, 0.5),
-                pos.getCenter().add(0.5, 0.5, 0.5),
-                colour);
+            BlockPos pos, Vector4f colour, float thickness, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+        Set<BlockPos> set = new HashSet<>();
+        set.add(pos);
+        buildMesh(set, colour, thickness, false, vertexConsumer);
     }
 
     public static void buildMesh(
@@ -72,16 +125,7 @@ public class OutlineMeshBuilder {
 
         Vec3[] corners = getCornerPositions(bb);
 
-        int[][] edges = new int[][] {
-            {0, 1}, {0, 2},
-            {0, 4}, {1, 3},
-            {1, 5}, {2, 3},
-            {2, 6}, {3, 7},
-            {4, 5}, {4, 6},
-            {5, 7}, {6, 7},
-        };
-
-        for (int[] edge : edges) {
+        for (int[] edge : EDGES) {
             buildLine(corners[edge[0]], corners[edge[1]], colour, thickness, vertexConsumer);
         }
     }
@@ -102,7 +146,7 @@ public class OutlineMeshBuilder {
         };
     }
 
-    private static void buildCuboidLine(
+    private static void buildLine(
             BiConsumer<Vector3d, Vector4f> vertexConsumer,
             Vec3 origin,
             Direction direction,
@@ -199,23 +243,13 @@ public class OutlineMeshBuilder {
 
     private static class Cluster {
 
-        private BlockPos anchor;
         private final Set<MergeEntry> visibleEdges;
 
         public Cluster() {
             visibleEdges = new HashSet<>();
         }
 
-        public boolean isEmpty() {
-            return anchor == null;
-        }
-
         public void include(BlockPos pos) {
-            if (anchor == null) anchor = pos;
-
-            pos = pos.subtract(anchor);
-
-            // 12 EDGES
             for (Direction.Axis axis : Direction.Axis.values()) {
                 for (Direction.Axis axis2 : Direction.Axis.values()) {
                     if (axis == axis2) continue;
@@ -254,7 +288,7 @@ public class OutlineMeshBuilder {
 
         @Override
         public int hashCode() {
-            return this.pos.hashCode() * 31 + axis.ordinal();
+            return pos.hashCode() * 31 + axis.ordinal();
         }
     }
 }

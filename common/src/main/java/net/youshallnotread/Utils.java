@@ -21,11 +21,10 @@ public class Utils {
         return entity.getRemovalReason() != null;
     }
 
-    public static Vector4f RBGAFromInt(int value) {
-        float r = ((value >> 24) & 0xFF) / 255f;
-        float g = ((value >> 16) & 0xFF) / 255f;
-        float b = ((value >> 8) & 0xFF) / 255f;
-        float a = (value & 0xFF) / 255f;
-        return new Vector4f(r, g, b, a);
+    public static Vector4f RBGFromInt(int value) {
+        float r = ((value >> 16) & 0xFF) / 255f;
+        float g = ((value >> 8) & 0xFF) / 255f;
+        float b = (value & 0xFF) / 255f;
+        return new Vector4f(r, g, b, 1.0f);
     }
 }

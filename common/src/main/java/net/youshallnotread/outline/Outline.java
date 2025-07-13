@@ -1,7 +1,7 @@
 package net.youshallnotread.outline;
 
 import java.time.LocalDateTime;
-import java.util.Collection;
+import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
@@ -27,11 +27,12 @@ public abstract class Outline {
     private final float thickness;
     private final Vector4f colour;
     private final Vector3f inflation;
+    private final boolean greedy;
 
     private final Type type;
 
     private final ResourceKey<Level> dimension;
-    private Collection<BlockPos> blockPosCollection;
+    private Set<BlockPos> blockPosCollection;
     private BlockPos blockPos;
     private Pair<Vec3, Vec3> line;
     private Entity entity;
@@ -51,6 +52,7 @@ public abstract class Outline {
         this.thickness = builder.thickness;
         this.inflation = builder.inflation;
         this.type = builder.type;
+        this.greedy = builder.greedy;
         this.dimension = builder.dimension;
         this.onChangedCallback = builder.onChangedCallback;
         this.onRemoveCallback = builder.onRemoveCallback;
@@ -116,6 +118,10 @@ public abstract class Outline {
         return type;
     }
 
+    public boolean greedy() {
+        return greedy;
+    }
+
     public ResourceKey<Level> dimension() {
         if (dimension == null) {
             if (entity != null) {
@@ -126,7 +132,7 @@ public abstract class Outline {
         return dimension;
     }
 
-    public Collection<BlockPos> blockPosCollection() {
+    public Set<BlockPos> blockPosCollection() {
         return blockPosCollection;
     }
 
@@ -189,6 +195,7 @@ public abstract class Outline {
         private Vector4f colour = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
         private String key = "";
         private Type type = Type.NONE;
+        private boolean greedy = false;
         private BiConsumer<Outline, Outline> onChangedCallback = null;
         private Consumer<Outline> onRemoveCallback = null;
         private Consumer<Outline> onSuspendCallback = null;
@@ -197,7 +204,7 @@ public abstract class Outline {
         private Function<Outline, Boolean> regenerateIfCallback = null;
 
         protected ResourceKey<Level> dimension = null;
-        protected Collection<BlockPos> blockPosCollection = null;
+        protected Set<BlockPos> blockPosCollection = null;
         protected BlockPos blockPos = null;
         protected Pair<Vec3, Vec3> line = null;
         protected Entity entity = null;
@@ -214,7 +221,7 @@ public abstract class Outline {
             return this;
         }
 
-        public Builder bounds(Collection<BlockPos> blocks, ResourceKey<Level> dimension) {
+        public Builder bounds(Set<BlockPos> blocks, ResourceKey<Level> dimension) {
             this.blockPosCollection = blocks;
             this.dimension = dimension;
             if (this.type != Type.NONE)
@@ -266,6 +273,11 @@ public abstract class Outline {
 
         public Builder key(String key) {
             this.key = key;
+            return this;
+        }
+
+        public Builder greedy() {
+            this.greedy = true;
             return this;
         }
 
