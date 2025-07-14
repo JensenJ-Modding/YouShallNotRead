@@ -21,6 +21,8 @@ public class MergedOutline extends BatchedOutline {
     private Set<MergedOutline> cachedOverlappingOutlines = new HashSet<>();
     private static final Set<String> dirtyOutlines = new HashSet<>();
 
+    public Set<OutlineMeshBuilder.MergeEntry> edges = new HashSet<>();
+
     public MergedOutline(Builder builder) {
         super(builder);
         this.showCollisions = builder.showCollisions;
@@ -39,11 +41,6 @@ public class MergedOutline extends BatchedOutline {
         } else {
             this.collisionBounds = null;
         }
-    }
-
-    @Override
-    void setupVertexData() {
-        super.setupVertexData();
     }
 
     public boolean hasMergedOutlinesChanged() {
@@ -101,6 +98,7 @@ public class MergedOutline extends BatchedOutline {
 
     public void markDirty() {
         dirtyOutlines.add(this.key());
+        edges.clear();
         for (MergedOutline outline : cachedOverlappingOutlines) {
             if (dirtyOutlines.contains(outline.key())) continue;
             outline.markDirty();

@@ -24,7 +24,6 @@ public class Outliner {
     private static boolean isBatchedListDirty = false;
 
     public static void processOutlines(Level level, PoseStack stack) {
-        // YouShallNotRead.LOGGER.info("Rendering {} outlines", OUTLINES.size());
         prepareOutlines();
         ResourceKey<Level> dimension = level.dimension();
         renderBatchedOutlines(dimension, stack);
@@ -34,7 +33,7 @@ public class Outliner {
     public static void prepareOutlines() {
         Set<Outline> outlinesToRemove = new HashSet<>();
         Set<Outline> outlinesToSuspend = new HashSet<>();
-        Set<Outline> outlinesToRegenerate = new HashSet<>();
+        List<Outline> outlinesToRegenerate = new ArrayList<>();
         for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
             Outline outline = entry.getValue();
             Function<Outline, Boolean> removeIf = outline.removeIfCallback();
@@ -140,6 +139,9 @@ public class Outliner {
         }
     }
 
+    // TODO: Add a batch add function, this will skip mesh generation until all overlapping outlines have been
+    // calculated,
+    //  This should offer a big performance boost rather than incrementally adding each outline, causing regeneration
     public static void addOutline(Outline outline) {
         if (outline instanceof MergedOutline mergedOutline) {
             mergedOutline.markDirty();
@@ -167,7 +169,6 @@ public class Outliner {
         // FIXME: Currently if an outline is suspended, the changed callback does not trigger.
         //  Also, in the event an outline is added which has a key within the suspended outlines list,
         //  the outline within suspended outlines is not removed, meaning upon unsuspension, it can overwrite a newer
-        // outline.
         if (OUTLINES.containsKey(outline.key())) {
             Outline oldOutline = OUTLINES.get(outline.key());
             BiConsumer<Outline, Outline> consumer = oldOutline.onChangedCallback();

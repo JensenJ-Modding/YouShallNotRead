@@ -87,7 +87,7 @@ public class YouShallNotReadClient {
                             level::dimension)
                     .colour(() -> Utils.RBGFromInt(0x00FF00))
                     .greedy(() -> true)
-                    .thickness(() -> 0.01f)
+                    .thickness(() -> 0.05f)
                     .collisionThickness(() -> 0.025f)
                     .build());
 
@@ -106,9 +106,11 @@ public class YouShallNotReadClient {
                                 return blockPositions;
                             },
                             level::dimension)
-                    .greedy(() -> true)
-                    .merge(() -> true, "test key")
+                    .greedy(() -> false)
+                    .merge(() -> false, "test key")
                     .colour(() -> Utils.RBGFromInt(0xEBD457))
+                    .regenerateIf((outline) -> false)
+                    .thickness(() -> 0.1f)
                     .collisionThickness(() -> 0.15f)
                     .build());
 
@@ -127,9 +129,10 @@ public class YouShallNotReadClient {
                                 return blockPositions;
                             },
                             level::dimension)
-                    .greedy(() -> true)
-                    .merge(() -> true, "test key")
+                    .greedy(() -> false)
+                    .merge(() -> false, "test key")
                     .colour(() -> Utils.RBGFromInt(0xFF00FF))
+                    .regenerateIf((outline) -> false)
                     .thickness(() -> 0.1f)
                     .collisionThickness(() -> 0.05f)
                     .build());

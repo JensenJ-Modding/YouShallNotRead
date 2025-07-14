@@ -45,16 +45,26 @@ public class OutlineMeshBuilder {
         Set<BlockPos> positions = outline.blockPosCollection();
         if (outline instanceof MergedOutline merged) {
             Set<MergedOutline> overlappingOutlines = merged.collidingOutlines();
-            positions.forEach((pos) -> cluster.include(pos, overlappingOutlines));
+
+            for (MergedOutline mergedOutline : overlappingOutlines) {
+                positions.addAll(mergedOutline.blockPosCollection());
+            }
+
+            positions.forEach((pos) -> cluster.include(pos, outline.blockPosCollection(), overlappingOutlines));
+            merged.edges = cluster.edges;
         } else {
-            positions.forEach((pos) -> cluster.include(pos, null));
+            positions.forEach((pos) -> cluster.include(pos, outline.blockPosCollection(), null));
         }
 
         if (outline.thickness() <= 0) return;
 
         if (outline.greedy()) {
             Map<Direction.Axis, List<Pair<BlockPos, Boolean>>> byAxis = new EnumMap<>(Direction.Axis.class);
-            for (MergeEntry entry : cluster.visibleEdges) {
+            for (MergeEntry entry : cluster.edges) {
+                byAxis.computeIfAbsent(entry.axis, a -> new ArrayList<>()).add(Pair.of(entry.pos, entry.colliding));
+            }
+
+            for (MergeEntry entry : cluster.collidingEdges) {
                 byAxis.computeIfAbsent(entry.axis, a -> new ArrayList<>()).add(Pair.of(entry.pos, entry.colliding));
             }
 
@@ -103,14 +113,18 @@ public class OutlineMeshBuilder {
                                     merged.collisionColour(),
                                     merged.collisionThickness(),
                                     vertexConsumer);
-                            continue;
+                        } else if (!start.second()) {
+                            buildLine(startVec, endVec, outline.colour(), outline.thickness(), vertexConsumer);
                         }
+                        continue;
                     }
                     buildLine(startVec, endVec, outline.colour(), outline.thickness(), vertexConsumer);
                 }
             }
         } else {
-            for (MergeEntry edge : cluster.visibleEdges) {
+            Set<MergeEntry> edges = cluster.edges;
+            edges.addAll(cluster.collidingEdges);
+            for (MergeEntry edge : cluster.edges) {
                 BlockPos pos = edge.pos;
                 Vec3 origin = new Vec3(pos.getX(), pos.getY(), pos.getZ());
                 Direction direction = Direction.get(Direction.AxisDirection.POSITIVE, edge.axis);
@@ -123,10 +137,12 @@ public class OutlineMeshBuilder {
                                 merged.collisionColour(),
                                 merged.collisionThickness(),
                                 vertexConsumer);
-                        continue;
+                    } else if (!edge.colliding) {
+                        buildLine(origin, direction, outline.colour(), outline.thickness(), vertexConsumer);
                     }
-                    buildLine(origin, direction, outline.colour(), outline.thickness(), vertexConsumer);
+                    continue;
                 }
+                buildLine(origin, direction, outline.colour(), outline.thickness(), vertexConsumer);
             }
         }
     }
@@ -262,13 +278,15 @@ public class OutlineMeshBuilder {
 
     private static class Cluster {
 
-        private final Set<MergeEntry> visibleEdges;
+        private final Set<MergeEntry> edges;
+        private final Set<MergeEntry> collidingEdges;
 
         public Cluster() {
-            visibleEdges = new HashSet<>();
+            edges = new HashSet<>();
+            collidingEdges = new HashSet<>();
         }
 
-        public void include(BlockPos pos, Set<MergedOutline> otherOutlines) {
+        public void include(BlockPos pos, Set<BlockPos> outlineBlockSet, Set<MergedOutline> otherOutlines) {
             for (Direction.Axis axis : Direction.Axis.values()) {
                 for (Direction.Axis axis2 : Direction.Axis.values()) {
                     if (axis == axis2) continue;
@@ -286,37 +304,56 @@ public class OutlineMeshBuilder {
 
                                 boolean colliding = false;
                                 if (otherOutlines != null) {
+                                    if (outlineBlockSet.contains(pos)) {
+                                        for (MergedOutline other : otherOutlines) {
+                                            if (other.blockPosCollection().contains(entryPos)) {
+                                                colliding = true;
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+
+                                MergeEntry entry = new MergeEntry(axis, entryPos, false);
+                                boolean skipOutline = false;
+                                if (otherOutlines != null) {
                                     for (MergedOutline other : otherOutlines) {
-                                        if (other.type() == Outline.Type.BLOCK
-                                                && other.blockPosCollection().contains(entryPos)) {
-                                            colliding = true;
+                                        if (other.edges.contains(entry)) {
+                                            skipOutline = true;
                                             break;
                                         }
                                     }
                                 }
 
-                                MergeEntry entry = new MergeEntry(axis, entryPos, colliding);
-                                if (!visibleEdges.remove(entry)) {
-                                    visibleEdges.add(entry);
+                                if (!edges.remove(entry)) {
+                                    if (!skipOutline) {
+                                        edges.add(entry);
+                                    }
+                                }
+
+                                if (colliding) {
+                                    MergeEntry collidingEntry = new MergeEntry(axis, entryPos, true);
+                                    if (!collidingEdges.remove(collidingEntry)) {
+                                        collidingEdges.add(collidingEntry);
+                                    }
                                 }
                             }
                         }
                     }
-
                     break;
                 }
             }
         }
     }
 
-    private record MergeEntry(Direction.Axis axis, BlockPos pos, boolean colliding) {
+    public record MergeEntry(Direction.Axis axis, BlockPos pos, boolean colliding) {
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (!(o instanceof MergeEntry other)) return false;
 
-            return this.axis == other.axis && this.pos.equals(other.pos) && colliding == other.colliding;
+            return this.axis == other.axis && this.pos.equals(other.pos);
         }
 
         @Override
