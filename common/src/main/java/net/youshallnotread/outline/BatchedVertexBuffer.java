@@ -4,11 +4,11 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.*;
 import org.apache.commons.collections4.collection.CompositeCollection;
 import org.joml.Vector3d;
-import org.joml.Vector4f;
+import org.joml.Vector3f;
 
 public class BatchedVertexBuffer {
 
-    public record OutlineVertex(Vector3d position, Vector4f colour) {}
+    public record OutlineVertex(Vector3d position, Vector3f colour) {}
 
     private static VertexBuffer vertexBuffer;
 
@@ -24,7 +24,7 @@ public class BatchedVertexBuffer {
 
         for (OutlineVertex vertex : vertices) {
             buffer.addVertex((float) vertex.position.x, (float) vertex.position.y, (float) vertex.position.z)
-                    .setColor(vertex.colour.x, vertex.colour.y, vertex.colour.z, vertex.colour.w);
+                    .setColor(vertex.colour.x, vertex.colour.y, vertex.colour.z, 1.0f);
         }
 
         vertexBuffer.bind();

@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.function.BiConsumer;
 
 import org.joml.Vector3d;
-import org.joml.Vector4f;
+import org.joml.Vector3f;
 
 public class BatchedOutline extends Outline {
 
@@ -17,7 +17,7 @@ public class BatchedOutline extends Outline {
 
     @Override
     void setupVertexData() {
-        BiConsumer<Vector3d, Vector4f> vertexConsumer =
+        BiConsumer<Vector3d, Vector3f> vertexConsumer =
                 (position, colour) -> vertices.add(new BatchedVertexBuffer.OutlineVertex(position, colour));
 
         OutlineMeshBuilder.buildMesh(this, vertexConsumer);

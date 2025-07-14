@@ -25,7 +25,7 @@ public class OutlineMeshBuilder {
         {5, 7}, {6, 7},
     };
 
-    public static void buildMesh(Outline outline, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+    public static void buildMesh(Outline outline, BiConsumer<Vector3d, Vector3f> vertexConsumer) {
         switch (outline.type()) {
             case ENTITY -> OutlineMeshBuilder.buildMesh(
                     outline.entity(), outline.colour(), outline.thickness(), outline.inflation(), vertexConsumer);
@@ -48,10 +48,10 @@ public class OutlineMeshBuilder {
 
     public static void buildMesh(
             Set<BlockPos> positions,
-            Vector4f colour,
+            Vector3f colour,
             float outlineWidth,
             boolean greedy,
-            BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+            BiConsumer<Vector3d, Vector3f> vertexConsumer) {
         Cluster cluster = new Cluster();
         positions.forEach(cluster::include);
 
@@ -100,13 +100,13 @@ public class OutlineMeshBuilder {
                 BlockPos pos = edge.pos;
                 Vec3 origin = new Vec3(pos.getX(), pos.getY(), pos.getZ());
                 Direction direction = Direction.get(Direction.AxisDirection.POSITIVE, edge.axis);
-                buildLine(vertexConsumer, origin, direction, outlineWidth, colour);
+                buildLine(origin, direction, colour, outlineWidth, vertexConsumer);
             });
         }
     }
 
     public static void buildMesh(
-            BlockPos pos, Vector4f colour, float thickness, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+            BlockPos pos, Vector3f colour, float thickness, BiConsumer<Vector3d, Vector3f> vertexConsumer) {
         Set<BlockPos> set = new HashSet<>();
         set.add(pos);
         buildMesh(set, colour, thickness, false, vertexConsumer);
@@ -114,10 +114,10 @@ public class OutlineMeshBuilder {
 
     public static void buildMesh(
             Entity entity,
-            Vector4f colour,
+            Vector3f colour,
             float thickness,
             Vector3f outlineInflation,
-            BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+            BiConsumer<Vector3d, Vector3f> vertexConsumer) {
         if (thickness <= 0) return;
         AABB bb = entity.getBoundingBox()
                 .inflate(outlineInflation.x, outlineInflation.y, outlineInflation.z)
@@ -147,11 +147,11 @@ public class OutlineMeshBuilder {
     }
 
     private static void buildLine(
-            BiConsumer<Vector3d, Vector4f> vertexConsumer,
             Vec3 origin,
             Direction direction,
+            Vector3f colour,
             float outlineWidth,
-            Vector4f colour) {
+            BiConsumer<Vector3d, Vector3f> vertexConsumer) {
         float halfWidth = outlineWidth / 2;
         Vec3 minPos = new Vec3(origin.x() - halfWidth, origin.y() - halfWidth, origin.z() - halfWidth);
         Vec3 maxPos = new Vec3(origin.x() + halfWidth, origin.y() + halfWidth, origin.z() + halfWidth);
@@ -169,7 +169,7 @@ public class OutlineMeshBuilder {
     }
 
     private static void buildLine(
-            Vec3 start, Vec3 end, Vector4f colour, float thickness, BiConsumer<Vector3d, Vector4f> vertexConsumer) {
+            Vec3 start, Vec3 end, Vector3f colour, float thickness, BiConsumer<Vector3d, Vector3f> vertexConsumer) {
         Vec3 dir = end.subtract(start);
         Vec3 norm = dir.normalize();
         Vec3 offset = norm.scale(thickness / 2.0);
@@ -196,7 +196,7 @@ public class OutlineMeshBuilder {
     }
 
     private static void buildCuboid(
-            BiConsumer<Vector3d, Vector4f> vertexConsumer, Vec3 minPos, Vec3 maxPos, Vector4f colour) {
+            BiConsumer<Vector3d, Vector3f> vertexConsumer, Vec3 minPos, Vec3 maxPos, Vector3f colour) {
         double minX = minPos.x();
         double minY = minPos.y();
         double minZ = minPos.z();

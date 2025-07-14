@@ -5,6 +5,7 @@ import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Function;
+import java.util.function.Supplier;
 
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -18,24 +19,23 @@ import com.mojang.blaze3d.vertex.*;
 import com.mojang.math.Axis;
 import it.unimi.dsi.fastutil.Pair;
 import org.joml.Vector3f;
-import org.joml.Vector4f;
 
 public abstract class Outline {
-    private final float duration;
     private final String key;
     private final LocalDateTime createdTimestamp;
-    private final float thickness;
-    private final Vector4f colour;
-    private final Vector3f inflation;
-    private final boolean greedy;
+    private final Supplier<Float> duration;
+    private final Supplier<Float> thickness;
+    private final Supplier<Vector3f> colour;
+    private final Supplier<Vector3f> inflation;
+    private final Supplier<Boolean> greedy;
 
     private final Type type;
 
-    private final ResourceKey<Level> dimension;
-    private Set<BlockPos> blockPosCollection;
-    private BlockPos blockPos;
-    private Pair<Vec3, Vec3> line;
-    private Entity entity;
+    private final Supplier<ResourceKey<Level>> dimension;
+    private Supplier<Set<BlockPos>> blockPosCollection;
+    private Supplier<BlockPos> blockPos;
+    private Supplier<Pair<Vec3, Vec3>> line;
+    private Supplier<Entity> entity;
 
     private final BiConsumer<Outline, Outline> onChangedCallback;
     private final Consumer<Outline> onRemoveCallback;
@@ -95,7 +95,10 @@ public abstract class Outline {
     }
 
     public float duration() {
-        return duration;
+        if (duration == null) {
+            return -1;
+        }
+        return duration.get();
     }
 
     public LocalDateTime createdTimestamp() {
@@ -103,15 +106,24 @@ public abstract class Outline {
     }
 
     public float thickness() {
-        return thickness;
+        if (thickness == null) {
+            return 0.05f;
+        }
+        return thickness.get();
     }
 
     public Vector3f inflation() {
-        return inflation;
+        if (inflation == null) {
+            return new Vector3f(0);
+        }
+        return inflation.get();
     }
 
-    public Vector4f colour() {
-        return colour;
+    public Vector3f colour() {
+        if (colour == null) {
+            return new Vector3f(1.0f, 1.0f, 1.0f);
+        }
+        return colour.get();
     }
 
     public Type type() {
@@ -119,33 +131,36 @@ public abstract class Outline {
     }
 
     public boolean greedy() {
-        return greedy;
+        if (greedy == null) {
+            return false;
+        }
+        return greedy.get();
     }
 
     public ResourceKey<Level> dimension() {
         if (dimension == null) {
             if (entity != null) {
-                return entity.level().dimension();
+                return entity.get().level().dimension();
             }
             throw new IllegalStateException("A dimension must be specified when creating a bounds of this type");
         }
-        return dimension;
+        return dimension.get();
     }
 
     public Set<BlockPos> blockPosCollection() {
-        return blockPosCollection;
+        return blockPosCollection.get();
     }
 
     public BlockPos blockPos() {
-        return blockPos;
+        return blockPos.get();
     }
 
-    public void setEntity(Entity newEntity) {
+    public void setEntity(Supplier<Entity> newEntity) {
         entity = newEntity;
     }
 
     public Entity entity() {
-        return entity;
+        return entity.get();
     }
 
     public BiConsumer<Outline, Outline> onChangedCallback() {
@@ -173,7 +188,7 @@ public abstract class Outline {
     }
 
     public Pair<Vec3, Vec3> line() {
-        return line;
+        return line.get();
     }
 
     public enum Type {
@@ -186,16 +201,18 @@ public abstract class Outline {
 
     public static class Builder {
 
-        boolean merge = false;
-        boolean showCollisions = false;
-        String mergeKey = "";
-        private float duration = -1;
-        private float thickness = 0.1f;
-        private Vector3f inflation = new Vector3f(0);
-        private Vector4f colour = new Vector4f(1.0f, 1.0f, 1.0f, 1.0f);
         private String key = "";
         private Type type = Type.NONE;
-        private boolean greedy = false;
+
+        boolean merge = false;
+        Supplier<Boolean> showCollisions = null;
+        String mergeKey = "";
+        private Supplier<Float> duration = null;
+        private Supplier<Float> thickness = null;
+        private Supplier<Vector3f> inflation = null;
+        private Supplier<Vector3f> colour = null;
+        private Supplier<Boolean> greedy = null;
+
         private BiConsumer<Outline, Outline> onChangedCallback = null;
         private Consumer<Outline> onRemoveCallback = null;
         private Consumer<Outline> onSuspendCallback = null;
@@ -203,25 +220,25 @@ public abstract class Outline {
         private Function<Outline, Boolean> removeIfCallback = null;
         private Function<Outline, Boolean> regenerateIfCallback = null;
 
-        protected ResourceKey<Level> dimension = null;
-        protected Set<BlockPos> blockPosCollection = null;
-        protected BlockPos blockPos = null;
-        protected Pair<Vec3, Vec3> line = null;
-        protected Entity entity = null;
+        protected Supplier<ResourceKey<Level>> dimension = null;
+        protected Supplier<Set<BlockPos>> blockPosCollection = null;
+        protected Supplier<BlockPos> blockPos = null;
+        protected Supplier<Pair<Vec3, Vec3>> line = null;
+        protected Supplier<Entity> entity = null;
 
-        public Builder duration(float duration) {
+        public Builder duration(Supplier<Float> duration) {
             this.duration = duration;
             return this;
         }
 
-        public Builder merge(boolean showCollisions, String mergeKey) {
+        public Builder merge(Supplier<Boolean> showCollisions, String mergeKey) {
             this.merge = true;
             this.showCollisions = showCollisions;
             this.mergeKey = mergeKey;
             return this;
         }
 
-        public Builder bounds(Set<BlockPos> blocks, ResourceKey<Level> dimension) {
+        public Builder boundsBlockGroup(Supplier<Set<BlockPos>> blocks, Supplier<ResourceKey<Level>> dimension) {
             this.blockPosCollection = blocks;
             this.dimension = dimension;
             if (this.type != Type.NONE)
@@ -230,7 +247,7 @@ public abstract class Outline {
             return this;
         }
 
-        public Builder bounds(BlockPos blockPos, ResourceKey<Level> dimension) {
+        public Builder boundsBlock(Supplier<BlockPos> blockPos, Supplier<ResourceKey<Level>> dimension) {
             this.blockPos = blockPos;
             this.dimension = dimension;
             if (this.type != Type.NONE)
@@ -239,7 +256,7 @@ public abstract class Outline {
             return this;
         }
 
-        public Builder bounds(Entity entity) {
+        public Builder boundsEntity(Supplier<Entity> entity) {
             this.entity = entity;
             if (this.type != Type.NONE)
                 throw new IllegalStateException("The bounds for this outline have already been set");
@@ -247,8 +264,8 @@ public abstract class Outline {
             return this;
         }
 
-        public Builder bounds(Vec3 start, Vec3 end, ResourceKey<Level> dimension) {
-            this.line = Pair.of(start, end);
+        public Builder boundsLine(Supplier<Pair<Vec3, Vec3>> line, Supplier<ResourceKey<Level>> dimension) {
+            this.line = line;
             this.dimension = dimension;
             if (this.type != Type.NONE)
                 throw new IllegalStateException("The bounds for this outline have already been set");
@@ -256,17 +273,17 @@ public abstract class Outline {
             return this;
         }
 
-        public Builder thickness(float thickness) {
+        public Builder thickness(Supplier<Float> thickness) {
             this.thickness = thickness;
             return this;
         }
 
-        public Builder inflation(Vector3f inflation) {
+        public Builder inflation(Supplier<Vector3f> inflation) {
             this.inflation = inflation;
             return this;
         }
 
-        public Builder colour(Vector4f colour) {
+        public Builder colour(Supplier<Vector3f> colour) {
             this.colour = colour;
             return this;
         }
@@ -276,8 +293,8 @@ public abstract class Outline {
             return this;
         }
 
-        public Builder greedy() {
-            this.greedy = true;
+        public Builder greedy(Supplier<Boolean> greedy) {
+            this.greedy = greedy;
             return this;
         }
 

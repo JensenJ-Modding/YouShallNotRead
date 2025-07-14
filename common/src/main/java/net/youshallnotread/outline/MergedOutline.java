@@ -3,13 +3,14 @@ package net.youshallnotread.outline;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Supplier;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 
 public class MergedOutline extends BatchedOutline {
 
-    private final boolean showCollisions;
+    private final Supplier<Boolean> showCollisions;
     private final String mergeKey;
     private final AABB collisionBounds;
     private Set<MergedOutline> cachedOverlappingOutlines = new HashSet<>();
@@ -63,7 +64,10 @@ public class MergedOutline extends BatchedOutline {
     }
 
     public boolean showCollisions() {
-        return showCollisions;
+        if (showCollisions == null) {
+            return false;
+        }
+        return showCollisions.get();
     }
 
     public AABB collisionBounds() {

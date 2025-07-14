@@ -3,7 +3,7 @@ package net.youshallnotread;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 
-import org.joml.Vector4f;
+import org.joml.Vector3f;
 
 public class Utils {
 
@@ -21,10 +21,10 @@ public class Utils {
         return entity.getRemovalReason() != null;
     }
 
-    public static Vector4f RBGFromInt(int value) {
+    public static Vector3f RBGFromInt(int value) {
         float r = ((value >> 16) & 0xFF) / 255f;
         float g = ((value >> 8) & 0xFF) / 255f;
         float b = (value & 0xFF) / 255f;
-        return new Vector4f(r, g, b, 1.0f);
+        return new Vector3f(r, g, b);
     }
 }
