@@ -1,6 +1,7 @@
 package net.youshallnotread.outline;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.Set;
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
@@ -33,7 +34,6 @@ public abstract class Outline {
 
     private final Supplier<ResourceKey<Level>> dimension;
     private Supplier<Set<BlockPos>> blockPosCollection;
-    private Supplier<BlockPos> blockPos;
     private Supplier<Pair<Vec3, Vec3>> line;
     private Supplier<Entity> entity;
 
@@ -64,8 +64,7 @@ public abstract class Outline {
         switch (this.type) {
             case ENTITY -> this.entity = builder.entity;
             case LINE -> this.line = builder.line;
-            case BLOCK -> this.blockPos = builder.blockPos;
-            case BLOCKGROUP -> this.blockPosCollection = builder.blockPosCollection;
+            case BLOCK -> this.blockPosCollection = builder.blockPosCollection;
         }
     }
 
@@ -151,10 +150,6 @@ public abstract class Outline {
         return blockPosCollection.get();
     }
 
-    public BlockPos blockPos() {
-        return blockPos.get();
-    }
-
     public void setEntity(Supplier<Entity> newEntity) {
         entity = newEntity;
     }
@@ -194,7 +189,6 @@ public abstract class Outline {
     public enum Type {
         NONE,
         BLOCK,
-        BLOCKGROUP,
         ENTITY,
         LINE
     }
@@ -204,14 +198,17 @@ public abstract class Outline {
         private String key = "";
         private Type type = Type.NONE;
 
-        boolean merge = false;
-        Supplier<Boolean> showCollisions = null;
-        String mergeKey = "";
         private Supplier<Float> duration = null;
         private Supplier<Float> thickness = null;
         private Supplier<Vector3f> inflation = null;
         private Supplier<Vector3f> colour = null;
         private Supplier<Boolean> greedy = null;
+
+        boolean merge = false;
+        Supplier<Boolean> showCollisions = null;
+        String mergeKey = "";
+        Supplier<Vector3f> collisionColour = null;
+        Supplier<Float> collisionThickness = null;
 
         private BiConsumer<Outline, Outline> onChangedCallback = null;
         private Consumer<Outline> onRemoveCallback = null;
@@ -222,7 +219,6 @@ public abstract class Outline {
 
         protected Supplier<ResourceKey<Level>> dimension = null;
         protected Supplier<Set<BlockPos>> blockPosCollection = null;
-        protected Supplier<BlockPos> blockPos = null;
         protected Supplier<Pair<Vec3, Vec3>> line = null;
         protected Supplier<Entity> entity = null;
 
@@ -238,17 +234,31 @@ public abstract class Outline {
             return this;
         }
 
+        public Builder collisionColour(Supplier<Vector3f> collisionColour) {
+            this.collisionColour = collisionColour;
+            return this;
+        }
+
+        public Builder collisionThickness(Supplier<Float> collisionThickness) {
+            this.collisionThickness = collisionThickness;
+            return this;
+        }
+
         public Builder boundsBlockGroup(Supplier<Set<BlockPos>> blocks, Supplier<ResourceKey<Level>> dimension) {
             this.blockPosCollection = blocks;
             this.dimension = dimension;
             if (this.type != Type.NONE)
                 throw new IllegalStateException("The bounds for this outline have already been set");
-            this.type = Type.BLOCKGROUP;
+            this.type = Type.BLOCK;
             return this;
         }
 
         public Builder boundsBlock(Supplier<BlockPos> blockPos, Supplier<ResourceKey<Level>> dimension) {
-            this.blockPos = blockPos;
+            this.blockPosCollection = () -> {
+                Set<BlockPos> set = new HashSet<>();
+                set.add(blockPos.get());
+                return set;
+            };
             this.dimension = dimension;
             if (this.type != Type.NONE)
                 throw new IllegalStateException("The bounds for this outline have already been set");
@@ -335,7 +345,7 @@ public abstract class Outline {
 
             switch (type) {
                 case NONE -> throw new IllegalStateException("Outline must have a type specified");
-                case BLOCK, BLOCKGROUP -> {
+                case BLOCK -> {
                     if (merge) {
                         return new MergedOutline(this);
                     } else {

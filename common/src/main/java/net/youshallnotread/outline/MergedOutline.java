@@ -8,38 +8,42 @@ import java.util.function.Supplier;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.AABB;
 
+import net.youshallnotread.Utils;
+import org.joml.Vector3f;
+
 public class MergedOutline extends BatchedOutline {
 
     private final Supplier<Boolean> showCollisions;
+    private final Supplier<Vector3f> collisionColour;
+    private final Supplier<Float> collisionThickness;
     private final String mergeKey;
     private final AABB collisionBounds;
     private Set<MergedOutline> cachedOverlappingOutlines = new HashSet<>();
-    private static final Set<MergedOutline> dirtyOutlines = new HashSet<>();
+    private static final Set<String> dirtyOutlines = new HashSet<>();
 
     public MergedOutline(Builder builder) {
         super(builder);
         this.showCollisions = builder.showCollisions;
         this.mergeKey = builder.mergeKey;
+        this.collisionColour = builder.collisionColour;
+        this.collisionThickness = builder.collisionThickness;
 
-        switch (this.type()) {
-            case BLOCK -> this.collisionBounds = AABB.encapsulatingFullBlocks(this.blockPos(), this.blockPos());
-            case BLOCKGROUP -> {
-                BlockPos minPos = new BlockPos(Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE);
-                BlockPos maxPos = new BlockPos(Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE);
-                for (BlockPos pos : this.blockPosCollection()) {
-                    maxPos = BlockPos.max(pos, maxPos);
-                    minPos = BlockPos.min(pos, minPos);
-                }
-                this.collisionBounds = AABB.encapsulatingFullBlocks(minPos, maxPos);
+        if (this.type() == Type.BLOCK) {
+            BlockPos minPos = new BlockPos(Integer.MAX_VALUE, Integer.MAX_VALUE, Integer.MAX_VALUE);
+            BlockPos maxPos = new BlockPos(Integer.MIN_VALUE, Integer.MIN_VALUE, Integer.MIN_VALUE);
+            for (BlockPos pos : this.blockPosCollection()) {
+                maxPos = BlockPos.max(pos, maxPos);
+                minPos = BlockPos.min(pos, minPos);
             }
-            default -> this.collisionBounds = null;
+            this.collisionBounds = AABB.encapsulatingFullBlocks(minPos, maxPos);
+        } else {
+            this.collisionBounds = null;
         }
     }
 
     @Override
     void setupVertexData() {
         super.setupVertexData();
-        dirtyOutlines.remove(this);
     }
 
     public boolean hasMergedOutlinesChanged() {
@@ -48,15 +52,22 @@ public class MergedOutline extends BatchedOutline {
             if (!(entry.getValue() instanceof MergedOutline outline)) continue;
             if (outline == this) continue;
             if (!this.dimension().equals(outline.dimension())) continue;
-            // TODO: Modify this so it only checks the 6 directly adjacent blocks, not diagonals
+
             if (this.collisionBounds().inflate(1).intersects(outline.collisionBounds())) {
-                newCollidingOutlines.add(outline);
+                if (this.mergeKey().equals(outline.mergeKey())) {
+                    newCollidingOutlines.add(outline);
+                }
             }
         }
 
         boolean isEqual = newCollidingOutlines.equals(cachedOverlappingOutlines);
         cachedOverlappingOutlines = newCollidingOutlines;
+        dirtyOutlines.remove(this.key());
         return !isEqual;
+    }
+
+    public Set<MergedOutline> collidingOutlines() {
+        return cachedOverlappingOutlines;
     }
 
     public String mergeKey() {
@@ -74,22 +85,34 @@ public class MergedOutline extends BatchedOutline {
         return collisionBounds;
     }
 
+    public Vector3f collisionColour() {
+        if (collisionColour == null) {
+            return new Vector3f(Utils.RBGFromInt(0xAA0000));
+        }
+        return collisionColour.get();
+    }
+
+    public float collisionThickness() {
+        if (collisionThickness == null) {
+            return 0.05f;
+        }
+        return collisionThickness.get();
+    }
+
     public void markDirty() {
-        dirtyOutlines.add(this);
+        dirtyOutlines.add(this.key());
         for (MergedOutline outline : cachedOverlappingOutlines) {
-            if (dirtyOutlines.contains(outline)) continue;
+            if (dirtyOutlines.contains(outline.key())) continue;
             outline.markDirty();
         }
     }
 
     public boolean dirty() {
-        return dirtyOutlines.contains(this);
+        return dirtyOutlines.contains(this.key());
     }
 
-    @Override
-    public void cleanup() {
-        super.cleanup();
-        dirtyOutlines.remove(this);
+    public void remove() {
+        dirtyOutlines.remove(this.key());
         cachedOverlappingOutlines.clear();
     }
 }

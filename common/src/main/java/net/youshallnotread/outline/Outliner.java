@@ -203,6 +203,7 @@ public class Outliner {
 
             if (existingOutline instanceof MergedOutline mergedOutline) {
                 mergedOutline.markDirty();
+                mergedOutline.remove();
             }
             OUTLINES.remove(key);
         }
@@ -248,10 +249,6 @@ public class Outliner {
                 return outlineA.entity().getUUID() == outlineB.entity().getUUID();
             }
             case BLOCK -> {
-                return outlineA.blockPos().equals(outlineB.blockPos())
-                        && outlineA.dimension().equals(outlineB.dimension());
-            }
-            case BLOCKGROUP -> {
                 return outlineA.blockPosCollection().equals(outlineB.blockPosCollection())
                         && outlineA.dimension().equals(outlineB.dimension());
             }

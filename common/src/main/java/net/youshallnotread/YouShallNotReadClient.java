@@ -62,43 +62,77 @@ public class YouShallNotReadClient {
             if (hand == InteractionHand.OFF_HAND) return EventResult.pass();
             if (!player.isShiftKeyDown()) return EventResult.pass();
 
-            Outline outline = new Outline.Builder()
-                    .key("test block")
+            Outliner.addOutline(new Outline.Builder()
+                    .key("what we want")
                     .boundsBlockGroup(
                             () -> {
-                                BlockPos center = new BlockPos(50, 50, 50);
-                                int radius = 50;
-                                int innerRadius = 25;
-                                int radiusSq = radius * radius;
-                                int innerRadiusSq = innerRadius * innerRadius;
                                 Set<BlockPos> blockPositions = new HashSet<>();
+                                for (int x = 0; x < 5; x++) {
+                                    for (int y = 0; y < 7; y++) {
+                                        for (int z = 0; z < 7; z++) {
+                                            blockPositions.add(blockPos.offset(x, y, z));
+                                        }
+                                    }
+                                }
 
-                                for (int x = 0; x < 100; x++) {
-                                    for (int y = 0; y < 100; y++) {
-                                        for (int z = 0; z < 100; z++) {
-                                            int dx = x - center.getX();
-                                            int dy = y - center.getY();
-                                            int dz = z - center.getZ();
-
-                                            int dist = dx * dx + dy * dy + dz * dz;
-                                            if (dist < innerRadiusSq) {
-                                                continue;
-                                            }
-
-                                            if (dist < radiusSq) {
-                                                blockPositions.add(blockPos.offset(x, y, z));
-                                            }
+                                for (int x = 3; x < 10; x++) {
+                                    for (int y = 0; y < 9; y++) {
+                                        for (int z = -2; z < 5; z++) {
+                                            blockPositions.add(blockPos.offset(x, y, z));
                                         }
                                     }
                                 }
                                 return blockPositions;
                             },
                             level::dimension)
+                    .colour(() -> Utils.RBGFromInt(0x00FF00))
+                    .greedy(() -> true)
+                    .thickness(() -> 0.01f)
+                    .collisionThickness(() -> 0.025f)
+                    .build());
+
+            Outliner.addOutline(new Outline.Builder()
+                    .key("test block")
+                    .boundsBlockGroup(
+                            () -> {
+                                Set<BlockPos> blockPositions = new HashSet<>();
+                                for (int x = 0; x < 5; x++) {
+                                    for (int y = 0; y < 7; y++) {
+                                        for (int z = 0; z < 7; z++) {
+                                            blockPositions.add(blockPos.offset(x, y, z));
+                                        }
+                                    }
+                                }
+                                return blockPositions;
+                            },
+                            level::dimension)
+                    .greedy(() -> true)
                     .merge(() -> true, "test key")
                     .colour(() -> Utils.RBGFromInt(0xEBD457))
-                    .build();
+                    .collisionThickness(() -> 0.15f)
+                    .build());
 
-            Outliner.addOutline(outline);
+            Outliner.addOutline(new Outline.Builder()
+                    .key("test block 2")
+                    .boundsBlockGroup(
+                            () -> {
+                                Set<BlockPos> blockPositions = new HashSet<>();
+                                for (int x = 3; x < 10; x++) {
+                                    for (int y = 0; y < 9; y++) {
+                                        for (int z = -2; z < 5; z++) {
+                                            blockPositions.add(blockPos.offset(x, y, z));
+                                        }
+                                    }
+                                }
+                                return blockPositions;
+                            },
+                            level::dimension)
+                    .greedy(() -> true)
+                    .merge(() -> true, "test key")
+                    .colour(() -> Utils.RBGFromInt(0xFF00FF))
+                    .thickness(() -> 0.1f)
+                    .collisionThickness(() -> 0.05f)
+                    .build());
 
             return EventResult.interruptFalse();
         }));

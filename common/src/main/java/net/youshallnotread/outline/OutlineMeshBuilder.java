@@ -9,6 +9,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 
+import it.unimi.dsi.fastutil.Pair;
 import org.joml.*;
 
 // Credit: A lot of the code in this class, particularly to do with the mesh building for merged outlines is from the
@@ -27,7 +28,7 @@ public class OutlineMeshBuilder {
 
     public static void buildMesh(Outline outline, BiConsumer<Vector3d, Vector3f> vertexConsumer) {
         switch (outline.type()) {
-            case ENTITY -> OutlineMeshBuilder.buildMesh(
+            case ENTITY -> OutlineMeshBuilder.buildEntity(
                     outline.entity(), outline.colour(), outline.thickness(), outline.inflation(), vertexConsumer);
             case LINE -> OutlineMeshBuilder.buildLine(
                     outline.line().first(),
@@ -35,47 +36,44 @@ public class OutlineMeshBuilder {
                     outline.colour(),
                     outline.thickness(),
                     vertexConsumer);
-            case BLOCK -> OutlineMeshBuilder.buildMesh(
-                    outline.blockPos(), outline.colour(), outline.thickness(), vertexConsumer);
-            case BLOCKGROUP -> OutlineMeshBuilder.buildMesh(
-                    outline.blockPosCollection(),
-                    outline.colour(),
-                    outline.thickness(),
-                    outline.greedy(),
-                    vertexConsumer);
+            case BLOCK -> OutlineMeshBuilder.buildBlockGroup(outline, vertexConsumer);
         }
     }
 
-    public static void buildMesh(
-            Set<BlockPos> positions,
-            Vector3f colour,
-            float outlineWidth,
-            boolean greedy,
-            BiConsumer<Vector3d, Vector3f> vertexConsumer) {
+    private static void buildBlockGroup(Outline outline, BiConsumer<Vector3d, Vector3f> vertexConsumer) {
         Cluster cluster = new Cluster();
-        positions.forEach(cluster::include);
+        Set<BlockPos> positions = outline.blockPosCollection();
+        if (outline instanceof MergedOutline merged) {
+            Set<MergedOutline> overlappingOutlines = merged.collidingOutlines();
+            positions.forEach((pos) -> cluster.include(pos, overlappingOutlines));
+        } else {
+            positions.forEach((pos) -> cluster.include(pos, null));
+        }
 
-        if (outlineWidth <= 0) return;
+        if (outline.thickness() <= 0) return;
 
-        if (greedy) {
-            Map<Direction.Axis, List<BlockPos>> byAxis = new EnumMap<>(Direction.Axis.class);
+        if (outline.greedy()) {
+            Map<Direction.Axis, List<Pair<BlockPos, Boolean>>> byAxis = new EnumMap<>(Direction.Axis.class);
             for (MergeEntry entry : cluster.visibleEdges) {
-                byAxis.computeIfAbsent(entry.axis, a -> new ArrayList<>()).add(entry.pos);
+                byAxis.computeIfAbsent(entry.axis, a -> new ArrayList<>()).add(Pair.of(entry.pos, entry.colliding));
             }
 
             for (var axis : Direction.Axis.values()) {
-                List<BlockPos> edges = byAxis.get(axis);
+                List<Pair<BlockPos, Boolean>> edges = byAxis.get(axis);
                 if (edges == null) continue;
 
-                edges.sort(Comparator.comparingInt((ob) -> ((BlockPos) ob).getX())
-                        .thenComparingInt((ob) -> ((BlockPos) ob).getY())
-                        .thenComparingInt((ob) -> ((BlockPos) ob).getZ()));
+                edges.sort(Comparator.comparingInt(
+                                (ob) -> ((Pair<BlockPos, Boolean>) ob).first().getX())
+                        .thenComparingInt(
+                                (ob) -> ((Pair<BlockPos, Boolean>) ob).first().getY())
+                        .thenComparingInt(
+                                (ob) -> ((Pair<BlockPos, Boolean>) ob).first().getZ()));
 
                 Set<BlockPos> visited = new HashSet<>();
-                for (BlockPos start : edges) {
-                    if (!visited.add(start)) continue;
+                for (Pair<BlockPos, Boolean> start : edges) {
+                    if (!visited.add(start.first())) continue;
 
-                    BlockPos end = start;
+                    BlockPos end = start.first();
                     Direction dir =
                             switch (axis) {
                                 case X -> Direction.EAST;
@@ -84,35 +82,56 @@ public class OutlineMeshBuilder {
                             };
 
                     while (true) {
-                        BlockPos next = end.relative(dir);
-                        if (!edges.contains(next) || !visited.add(next)) break;
-                        end = next;
+                        Pair<BlockPos, Boolean> next = Pair.of(end.relative(dir), start.second());
+                        if (!edges.contains(next) || !visited.add(next.first())) break;
+                        end = next.first();
                     }
 
-                    Vec3 startVec = new Vec3(start.getX(), start.getY(), start.getZ());
+                    Vec3 startVec = new Vec3(
+                            start.first().getX(),
+                            start.first().getY(),
+                            start.first().getZ());
                     BlockPos endOffset = end.offset(dir.getNormal());
                     Vec3 endVec = new Vec3(endOffset.getX(), endOffset.getY(), endOffset.getZ());
-                    buildLine(startVec, endVec, colour, outlineWidth, vertexConsumer);
+
+                    if (outline instanceof MergedOutline merged) {
+                        if (merged.showCollisions() && start.second()) {
+                            if (merged.collisionThickness() <= 0) continue;
+                            buildLine(
+                                    startVec,
+                                    endVec,
+                                    merged.collisionColour(),
+                                    merged.collisionThickness(),
+                                    vertexConsumer);
+                            continue;
+                        }
+                    }
+                    buildLine(startVec, endVec, outline.colour(), outline.thickness(), vertexConsumer);
                 }
             }
         } else {
-            cluster.visibleEdges.forEach(edge -> {
+            for (MergeEntry edge : cluster.visibleEdges) {
                 BlockPos pos = edge.pos;
                 Vec3 origin = new Vec3(pos.getX(), pos.getY(), pos.getZ());
                 Direction direction = Direction.get(Direction.AxisDirection.POSITIVE, edge.axis);
-                buildLine(origin, direction, colour, outlineWidth, vertexConsumer);
-            });
+                if (outline instanceof MergedOutline merged) {
+                    if (merged.showCollisions() && edge.colliding) {
+                        if (merged.collisionThickness() <= 0) continue;
+                        buildLine(
+                                origin,
+                                direction,
+                                merged.collisionColour(),
+                                merged.collisionThickness(),
+                                vertexConsumer);
+                        continue;
+                    }
+                    buildLine(origin, direction, outline.colour(), outline.thickness(), vertexConsumer);
+                }
+            }
         }
     }
 
-    public static void buildMesh(
-            BlockPos pos, Vector3f colour, float thickness, BiConsumer<Vector3d, Vector3f> vertexConsumer) {
-        Set<BlockPos> set = new HashSet<>();
-        set.add(pos);
-        buildMesh(set, colour, thickness, false, vertexConsumer);
-    }
-
-    public static void buildMesh(
+    public static void buildEntity(
             Entity entity,
             Vector3f colour,
             float thickness,
@@ -249,7 +268,7 @@ public class OutlineMeshBuilder {
             visibleEdges = new HashSet<>();
         }
 
-        public void include(BlockPos pos) {
+        public void include(BlockPos pos, Set<MergedOutline> otherOutlines) {
             for (Direction.Axis axis : Direction.Axis.values()) {
                 for (Direction.Axis axis2 : Direction.Axis.values()) {
                     if (axis == axis2) continue;
@@ -264,8 +283,22 @@ public class OutlineMeshBuilder {
                             BlockPos entryPos = pos.relative(direction, offset);
                             for (int offset2 : new int[] {0, 1}) {
                                 entryPos = entryPos.relative(direction2, offset2);
-                                MergeEntry entry = new MergeEntry(axis, entryPos);
-                                if (!visibleEdges.remove(entry)) visibleEdges.add(entry);
+
+                                boolean colliding = false;
+                                if (otherOutlines != null) {
+                                    for (MergedOutline other : otherOutlines) {
+                                        if (other.type() == Outline.Type.BLOCK
+                                                && other.blockPosCollection().contains(entryPos)) {
+                                            colliding = true;
+                                            break;
+                                        }
+                                    }
+                                }
+
+                                MergeEntry entry = new MergeEntry(axis, entryPos, colliding);
+                                if (!visibleEdges.remove(entry)) {
+                                    visibleEdges.add(entry);
+                                }
                             }
                         }
                     }
@@ -276,14 +309,14 @@ public class OutlineMeshBuilder {
         }
     }
 
-    private record MergeEntry(Direction.Axis axis, BlockPos pos) {
+    private record MergeEntry(Direction.Axis axis, BlockPos pos, boolean colliding) {
 
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
             if (!(o instanceof MergeEntry other)) return false;
 
-            return this.axis == other.axis && this.pos.equals(other.pos);
+            return this.axis == other.axis && this.pos.equals(other.pos) && colliding == other.colliding;
         }
 
         @Override
