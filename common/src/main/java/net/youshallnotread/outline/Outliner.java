@@ -144,6 +144,10 @@ public class Outliner {
     //  This should offer a big performance boost rather than incrementally adding each outline, causing regeneration
     public static void addOutline(Outline outline) {
         if (outline instanceof MergedOutline mergedOutline) {
+            if (OUTLINES.containsKey(outline.key())) {
+                MergedOutline oldOutline = (MergedOutline) OUTLINES.get(outline.key());
+                oldOutline.remove();
+            }
             mergedOutline.markDirty();
         }
 

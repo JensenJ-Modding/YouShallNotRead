@@ -19,7 +19,7 @@ public class MergedOutline extends BatchedOutline {
     private final String mergeKey;
     private final AABB collisionBounds;
     private Set<MergedOutline> cachedOverlappingOutlines = new HashSet<>();
-    private static final Set<String> dirtyOutlines = new HashSet<>();
+    private static final Set<MergedOutline> dirtyOutlines = new HashSet<>();
 
     public Set<OutlineMeshBuilder.MergeEntry> edges = new HashSet<>();
 
@@ -43,7 +43,7 @@ public class MergedOutline extends BatchedOutline {
         }
     }
 
-    public boolean hasMergedOutlinesChanged() {
+    public Set<MergedOutline> calculateOverlappingOutlines() {
         Set<MergedOutline> newCollidingOutlines = new HashSet<>();
         for (Map.Entry<String, Outline> entry : Outliner.OUTLINES.entrySet()) {
             if (!(entry.getValue() instanceof MergedOutline outline)) continue;
@@ -56,10 +56,14 @@ public class MergedOutline extends BatchedOutline {
                 }
             }
         }
+        return newCollidingOutlines;
+    }
 
+    public boolean hasMergedOutlinesChanged() {
+        Set<MergedOutline> newCollidingOutlines = calculateOverlappingOutlines();
         boolean isEqual = newCollidingOutlines.equals(cachedOverlappingOutlines);
         cachedOverlappingOutlines = newCollidingOutlines;
-        dirtyOutlines.remove(this.key());
+        dirtyOutlines.remove(this);
         return !isEqual;
     }
 
@@ -97,20 +101,25 @@ public class MergedOutline extends BatchedOutline {
     }
 
     public void markDirty() {
-        dirtyOutlines.add(this.key());
+        dirtyOutlines.add(this);
         edges.clear();
-        for (MergedOutline outline : cachedOverlappingOutlines) {
-            if (dirtyOutlines.contains(outline.key())) continue;
+        for (MergedOutline outline : calculateOverlappingOutlines()) {
+            if (dirtyOutlines.contains(outline)) continue;
             outline.markDirty();
         }
     }
 
     public boolean dirty() {
-        return dirtyOutlines.contains(this.key());
+        return dirtyOutlines.contains(this);
     }
 
+    // Called when the outline is removed, or when it is replaced by another with the same key
     public void remove() {
-        dirtyOutlines.remove(this.key());
+        for (MergedOutline outline : cachedOverlappingOutlines) {
+            if (dirtyOutlines.contains(outline)) continue;
+            outline.markDirty();
+        }
         cachedOverlappingOutlines.clear();
+        dirtyOutlines.remove(this);
     }
 }

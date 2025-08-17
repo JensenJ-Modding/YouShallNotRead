@@ -5,6 +5,7 @@ import java.util.Set;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionHand;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.AABB;
 
@@ -62,81 +63,80 @@ public class YouShallNotReadClient {
             if (hand == InteractionHand.OFF_HAND) return EventResult.pass();
             if (!player.isShiftKeyDown()) return EventResult.pass();
 
-            Outliner.addOutline(new Outline.Builder()
-                    .key("what we want")
-                    .boundsBlockGroup(
-                            () -> {
-                                Set<BlockPos> blockPositions = new HashSet<>();
-                                for (int x = 0; x < 5; x++) {
-                                    for (int y = 0; y < 7; y++) {
-                                        for (int z = 0; z < 7; z++) {
-                                            blockPositions.add(blockPos.offset(x, y, z));
+            if (player.getItemInHand(hand).getItem() == Items.WOODEN_SWORD) {
+                Outliner.addOutline(new Outline.Builder()
+                        .key("red cube")
+                        .boundsBlockGroup(
+                                () -> {
+                                    Set<BlockPos> blockPositions = new HashSet<>();
+                                    for (int x = 0; x < 8; x++) {
+                                        for (int y = 0; y < 8; y++) {
+                                            for (int z = 0; z < 7; z++) {
+                                                blockPositions.add(blockPos.offset(x, y, z));
+                                            }
                                         }
                                     }
-                                }
+                                    return blockPositions;
+                                },
+                                level::dimension)
+                        .greedy(() -> true)
+                        .merge(() -> false, "test key")
+                        .colour(() -> Utils.RBGFromInt(0xFF0000))
+                        .regenerateIf((outline) -> false)
+                        .thickness(() -> 0.1f)
+                        .collisionThickness(() -> 0.15f)
+                        .build());
+            }
 
-                                for (int x = 3; x < 10; x++) {
-                                    for (int y = 0; y < 9; y++) {
-                                        for (int z = -2; z < 5; z++) {
-                                            blockPositions.add(blockPos.offset(x, y, z));
+            if (player.getItemInHand(hand).getItem() == Items.WOODEN_HOE) {
+                Outliner.addOutline(new Outline.Builder()
+                        .key("green cube")
+                        .boundsBlockGroup(
+                                () -> {
+                                    Set<BlockPos> blockPositions = new HashSet<>();
+                                    for (int x = 0; x < 4; x++) {
+                                        for (int y = 0; y < 4; y++) {
+                                            for (int z = 0; z < 3; z++) {
+                                                blockPositions.add(blockPos.offset(x, y, z));
+                                            }
                                         }
                                     }
-                                }
-                                return blockPositions;
-                            },
-                            level::dimension)
-                    .colour(() -> Utils.RBGFromInt(0x00FF00))
-                    .greedy(() -> true)
-                    .thickness(() -> 0.05f)
-                    .collisionThickness(() -> 0.025f)
-                    .build());
+                                    return blockPositions;
+                                },
+                                level::dimension)
+                        .greedy(() -> true)
+                        .merge(() -> false, "test key")
+                        .colour(() -> Utils.RBGFromInt(0x00FF00))
+                        .regenerateIf((outline) -> false)
+                        .thickness(() -> 0.15f)
+                        .collisionThickness(() -> 0.05f)
+                        .build());
+            }
 
-            Outliner.addOutline(new Outline.Builder()
-                    .key("test block")
-                    .boundsBlockGroup(
-                            () -> {
-                                Set<BlockPos> blockPositions = new HashSet<>();
-                                for (int x = 0; x < 5; x++) {
-                                    for (int y = 0; y < 7; y++) {
-                                        for (int z = 0; z < 7; z++) {
-                                            blockPositions.add(blockPos.offset(x, y, z));
+            if (player.getItemInHand(hand).getItem() == Items.WOODEN_PICKAXE) {
+                Outliner.addOutline(new Outline.Builder()
+                        .key("blue cube")
+                        .boundsBlockGroup(
+                                () -> {
+                                    Set<BlockPos> blockPositions = new HashSet<>();
+                                    for (int x = 0; x < 2; x++) {
+                                        for (int y = 0; y < 3; y++) {
+                                            for (int z = 0; z < 2; z++) {
+                                                blockPositions.add(blockPos.offset(x, y, z));
+                                            }
                                         }
                                     }
-                                }
-                                return blockPositions;
-                            },
-                            level::dimension)
-                    .greedy(() -> false)
-                    .merge(() -> false, "test key")
-                    .colour(() -> Utils.RBGFromInt(0xEBD457))
-                    .regenerateIf((outline) -> false)
-                    .thickness(() -> 0.1f)
-                    .collisionThickness(() -> 0.15f)
-                    .build());
-
-            Outliner.addOutline(new Outline.Builder()
-                    .key("test block 2")
-                    .boundsBlockGroup(
-                            () -> {
-                                Set<BlockPos> blockPositions = new HashSet<>();
-                                for (int x = 3; x < 10; x++) {
-                                    for (int y = 0; y < 9; y++) {
-                                        for (int z = -2; z < 5; z++) {
-                                            blockPositions.add(blockPos.offset(x, y, z));
-                                        }
-                                    }
-                                }
-                                return blockPositions;
-                            },
-                            level::dimension)
-                    .greedy(() -> false)
-                    .merge(() -> false, "test key")
-                    .colour(() -> Utils.RBGFromInt(0xFF00FF))
-                    .regenerateIf((outline) -> false)
-                    .thickness(() -> 0.1f)
-                    .collisionThickness(() -> 0.05f)
-                    .build());
-
+                                    return blockPositions;
+                                },
+                                level::dimension)
+                        .greedy(() -> true)
+                        .merge(() -> false, "test key")
+                        .colour(() -> Utils.RBGFromInt(0x0000FF))
+                        .regenerateIf((outline) -> false)
+                        .thickness(() -> 0.2f)
+                        .collisionThickness(() -> 0.05f)
+                        .build());
+            }
             return EventResult.interruptFalse();
         }));
 
