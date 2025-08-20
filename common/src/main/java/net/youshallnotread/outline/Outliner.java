@@ -64,6 +64,10 @@ public class Outliner {
                 continue;
             }
 
+            if (!outline.hasMeshData()) {
+                outlinesToRegenerate.add(outline);
+            }
+
             if (!isBatchedListDirty) continue;
             if (!(outline instanceof MergedOutline mergedOutline)) continue;
             if (!mergedOutline.dirty()) continue;
@@ -75,10 +79,15 @@ public class Outliner {
 
         outlinesToRemove.forEach(Outliner::removeOutline);
         outlinesToSuspend.forEach(Outliner::suspendOutline);
+        Set<Outline> outlinesRegenerated = new HashSet<>();
         outlinesToRegenerate.forEach(outline -> {
-            outline.cleanup();
-            outline.setupVertexData();
+            if (!outlinesRegenerated.contains(outline)) {
+                outline.cleanup();
+                outline.setupVertexData();
+            }
+            outlinesRegenerated.add(outline);
         });
+        outlinesRegenerated.clear();
     }
 
     public static boolean hasOutlineDurationExpired(Outline outline) {
@@ -89,38 +98,16 @@ public class Outliner {
     }
 
     public static void renderBatchedOutlines(ResourceKey<Level> dimension, PoseStack stack) {
-        // If list is clean we can use the cached vertex buffer, then return
-        //   We need to work out criteria for dirtying the list
-        //     changing dimensions
-        //     if an outline goes out of view
-        //     is culled/unculled
-        //     manually added / removed outlines
-
-        // List is dirty
-        // This bit might want to be done on a separate render thread if performance hits are bad when generating new
-        // buffers
-        //  Create a temp vertex buffer which we can swap with the loaded one upon generation
-        //  For each block based outline
-        //    If outline is dirty, we need to generate its vertices, including colliding verts if the outline is merged
-        //    We can then mark this outline as clean
-        //    Add this outlines verts to the buffer, we can use cached values if outline was clean
-        //  Render the buffer, mark list as clean
-
         if (isBatchedListDirty) {
             CompositeCollection<BatchedVertexBuffer.OutlineVertex> batchedVertices = new CompositeCollection<>();
             for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
                 if (!(entry.getValue() instanceof BatchedOutline outline)) continue;
                 if (!outline.dimension().equals(dimension)) continue;
 
-                // if(outline instanceof MergedOutline mergedOutline){
-                //    if(mergedOutline.dirty()){
-                //        mergedOutline.cleanup();
-                //        mergedOutline.setupVertexData();
-                //    }
-                // }
-
-                // TODO: Only add if this outline should render
-                batchedVertices.addComposited(outline.vertices());
+                // TODO: Only add if this outline should render this frame
+                if (outline.hasMeshData()) {
+                    batchedVertices.addComposited(outline.vertices());
+                }
             }
             BatchedVertexBuffer.cleanup();
             BatchedVertexBuffer.populateVertexBuffer(batchedVertices);
@@ -135,6 +122,7 @@ public class Outliner {
         for (Map.Entry<String, Outline> entry : OUTLINES.entrySet()) {
             if (!(entry.getValue() instanceof StandaloneOutline outline)) continue;
             if (!outline.dimension().equals(dimension)) continue;
+            // TODO: only render if we should
             OutlineRenderer.renderOutline(outline, stack);
         }
     }
@@ -153,10 +141,6 @@ public class Outliner {
 
         if (outline instanceof BatchedOutline) {
             refreshOutlines();
-        }
-
-        if (!outline.hasVertexData()) {
-            outline.setupVertexData();
         }
 
         if (outline.type() == Outline.Type.ENTITY) {

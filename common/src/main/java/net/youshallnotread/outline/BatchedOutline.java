@@ -17,6 +17,7 @@ public class BatchedOutline extends Outline {
 
     @Override
     void setupVertexData() {
+        super.setupVertexData();
         BiConsumer<Vector3d, Vector3f> vertexConsumer =
                 (position, colour) -> vertices.add(new BatchedVertexBuffer.OutlineVertex(position, colour));
 
@@ -24,12 +25,8 @@ public class BatchedOutline extends Outline {
     }
 
     @Override
-    boolean hasVertexData() {
-        return !vertices.isEmpty();
-    }
-
-    @Override
     void cleanup() {
+        super.cleanup();
         vertices.clear();
     }
 

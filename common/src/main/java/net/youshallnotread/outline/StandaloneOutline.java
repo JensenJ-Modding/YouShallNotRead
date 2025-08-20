@@ -17,6 +17,7 @@ public class StandaloneOutline extends Outline {
 
     @Override
     void setupVertexData() {
+        super.setupVertexData();
         RenderSystem.assertOnRenderThread();
         Tesselator tesselator = Tesselator.getInstance();
 
@@ -35,13 +36,9 @@ public class StandaloneOutline extends Outline {
     }
 
     @Override
-    boolean hasVertexData() {
-        return vertexBuffer != null;
-    }
-
-    @Override
     void cleanup() {
-        if (hasVertexData()) {
+        super.cleanup();
+        if (hasMeshData()) {
             vertexBuffer.close();
             vertexBuffer = null;
         }

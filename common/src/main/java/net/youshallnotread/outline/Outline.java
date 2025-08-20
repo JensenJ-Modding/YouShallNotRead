@@ -29,8 +29,11 @@ public abstract class Outline {
     private final Supplier<Vector3f> colour;
     private final Supplier<Vector3f> inflation;
     private final Supplier<Boolean> greedy;
+    private final long creationIndex;
+    private static long CREATION_INDEX_COUNTER = 0;
 
     private final Type type;
+    private boolean hasMesh = false;
 
     private final Supplier<ResourceKey<Level>> dimension;
     private Supplier<Set<BlockPos>> blockPosCollection;
@@ -46,6 +49,7 @@ public abstract class Outline {
 
     public Outline(Builder builder) {
         this.key = builder.key;
+        this.creationIndex = CREATION_INDEX_COUNTER++;
         this.duration = builder.duration;
         this.createdTimestamp = LocalDateTime.now();
         this.colour = builder.colour;
@@ -68,11 +72,17 @@ public abstract class Outline {
         }
     }
 
-    abstract void setupVertexData();
+    void setupVertexData() {
+        hasMesh = true;
+    }
 
-    abstract boolean hasVertexData();
+    boolean hasMeshData() {
+        return hasMesh;
+    }
 
-    abstract void cleanup();
+    void cleanup() {
+        hasMesh = false;
+    }
 
     void transform(PoseStack pose) {
         if (this.type() == Type.ENTITY) {
@@ -91,6 +101,10 @@ public abstract class Outline {
 
     public String key() {
         return key;
+    }
+
+    public long creationIndex() {
+        return creationIndex;
     }
 
     public float duration() {

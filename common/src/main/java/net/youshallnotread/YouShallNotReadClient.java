@@ -80,12 +80,13 @@ public class YouShallNotReadClient {
                                 },
                                 level::dimension)
                         .greedy(() -> true)
-                        .merge(() -> false, "test key")
+                        .merge(() -> true, "test key")
                         .colour(() -> Utils.RBGFromInt(0xFF0000))
-                        .regenerateIf((outline) -> false)
                         .thickness(() -> 0.1f)
-                        .collisionThickness(() -> 0.15f)
+                        .collisionThickness(() -> 0.07f)
+                        .collisionColour(() -> Utils.RBGFromInt(0xAA0000))
                         .build());
+                return EventResult.interruptFalse();
             }
 
             if (player.getItemInHand(hand).getItem() == Items.WOODEN_HOE) {
@@ -105,12 +106,13 @@ public class YouShallNotReadClient {
                                 },
                                 level::dimension)
                         .greedy(() -> true)
-                        .merge(() -> false, "test key")
+                        .merge(() -> true, "test key")
                         .colour(() -> Utils.RBGFromInt(0x00FF00))
-                        .regenerateIf((outline) -> false)
                         .thickness(() -> 0.15f)
+                        .collisionColour(() -> Utils.RBGFromInt(0x00AA00))
                         .collisionThickness(() -> 0.05f)
                         .build());
+                return EventResult.interruptFalse();
             }
 
             if (player.getItemInHand(hand).getItem() == Items.WOODEN_PICKAXE) {
@@ -130,14 +132,15 @@ public class YouShallNotReadClient {
                                 },
                                 level::dimension)
                         .greedy(() -> true)
-                        .merge(() -> false, "test key")
+                        .merge(() -> true, "test key")
                         .colour(() -> Utils.RBGFromInt(0x0000FF))
-                        .regenerateIf((outline) -> false)
                         .thickness(() -> 0.2f)
-                        .collisionThickness(() -> 0.05f)
+                        .collisionColour(() -> Utils.RBGFromInt(0x0000AA))
+                        .collisionThickness(() -> 0.03f)
                         .build());
+                return EventResult.interruptFalse();
             }
-            return EventResult.interruptFalse();
+            return EventResult.pass();
         }));
 
         InteractionEvent.LEFT_CLICK_BLOCK.register(((player, hand, blockPos, face) -> {
